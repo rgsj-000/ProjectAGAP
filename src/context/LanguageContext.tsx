@@ -15,8 +15,8 @@ const translations: Record<string, { en: string; fil: string }> = {
   // Brand & Subtitle
   appTitle: { en: "PROJECT AGAP", fil: "PROYEKTO AGAP" },
   appTagline: {
-    en: "AI-Guided Assessment & Prioritization",
-    fil: "Pagtatasa at Pag-uuna Gamit ang AI",
+    en: "AI-Assisted Disaster Decision Support",
+    fil: "AI-Assisted na Suporta sa Desisyon sa Sakuna",
   },
   pilotBadge: {
     en: "Pilot: Lucena City, Quezon",
@@ -24,20 +24,20 @@ const translations: Record<string, { en: string; fil: string }> = {
   },
 
   // Primary Navigation
-  navHome: { en: "Home", fil: "Home" },
+  navHome: { en: "Home", fil: "Tahanan" },
   navPrepare: { en: "Preparedness", fil: "Paghahanda" },
   navReport: { en: "Damage & Needs", fil: "Pinsala at Pangangailangan" },
-  navRecovery: { en: "Recovery Priorities", fil: "Priyoridad sa Pagbangon" },
+  navRecovery: { en: "Post Impact", fil: "Post Impact" },
   help: { en: "Help & Emergency", fil: "Tulong at Emergency" },
 
   // Home Screen
   homeGreeting: { en: "Magandang araw.", fil: "Magandang araw." },
   homeSubtitle: {
-    en: "Helping Lucena prepare and recover using verified disaster information.",
-    fil: "Tumutulong sa Lucena na maghanda at bumangon gamit ang beripikadong impormasyon.",
+    en: "Supporting Lucena preparedness, response, and post-impact review using verified disaster information.",
+    fil: "Sinusuportahan ang paghahanda, pagtugon, at post-impact review ng Lucena gamit ang beripikadong disaster information.",
   },
-  currentAdvisoryLabel: { en: "CURRENT ADVISORY", fil: "KASALUKUYANG BABALA" },
-  advisoryActive: { en: "ACTIVE", fil: "AKTIBO" },
+  currentAdvisoryLabel: { en: "ADVISORY STATUS", fil: "STATUS NG ADVISORY" },
+  advisoryActive: { en: "ADVISORY RECORD", fil: "ADVISORY RECORD" },
   viewAdvisory: { en: "View Advisory", fil: "Tingnan ang Babala" },
   whatDoYouNeedToDo: { en: "WHAT DO YOU NEED TO DO?", fil: "ANO ANG KAILANGAN MONG GAWIN?" },
 
@@ -48,19 +48,19 @@ const translations: Record<string, { en: string; fil: string }> = {
   },
   actionPrepareBtn: { en: "Start Preparing", fil: "Magsimula sa Paghahanda" },
 
-  actionReportTitle: { en: "2. REPORT DAMAGE", fil: "2. MAG-ULAT NG PINSALA" },
+  actionReportTitle: { en: "2. DAMAGE & NEEDS", fil: "2. PINSALA AT PANGANGAILANGAN" },
   actionReportDesc: {
-    en: "Record damage and urgent community needs.",
-    fil: "Magtala ng mga pinsala at agarang pangangailangan ng komunidad.",
+    en: "Record reported damage, urgent needs, evidence, and verification state.",
+    fil: "Itala ang reported na pinsala, agarang pangangailangan, ebidensya, at verification state.",
   },
-  actionReportBtn: { en: "Report Damage", fil: "Mag-ulat ng Pinsala" },
+  actionReportBtn: { en: "Open Report", fil: "Buksan ang Ulat" },
 
-  actionRecoveryTitle: { en: "3. RECOVERY", fil: "3. PAGBANGON" },
+  actionRecoveryTitle: { en: "3. POST IMPACT", fil: "3. POST IMPACT" },
   actionRecoveryDesc: {
-    en: "See where assistance may be needed first.",
-    fil: "Tingnan kung saan unang kailangan ang tulong at ayuda.",
+    en: "Review reported versus validated impacts, unmet needs, and source-anchored LGU actions.",
+    fil: "Suriin ang reported versus validated impacts, unmet needs, at source-anchored LGU actions.",
   },
-  actionRecoveryBtn: { en: "View Recovery", fil: "Tingnan ang Pagbangon" },
+  actionRecoveryBtn: { en: "View Post Impact", fil: "Tingnan ang Post Impact" },
 
   needHelp: { en: "Need Help?", fil: "Kailangan ng Tulong?" },
   contactLguHotlines: {
@@ -69,46 +69,46 @@ const translations: Record<string, { en: string; fil: string }> = {
   },
 
   // Prepare Screen
-  prepareTitle: { en: "PREPAREDNESS", fil: "PAGHAHANDA" },
+  prepareTitle: { en: "PREPARE", fil: "PAGHAHANDA" },
   currentOfficialAdvisory: {
-    en: "Current official advisory:",
-    fil: "Kasalukuyang opisyal na babala:",
+    en: "Current advisory record:",
+    fil: "Kasalukuyang advisory record:",
   },
   whatWouldYouLikeToDo: {
     en: "What would you like to do?",
     fil: "Ano ang nais mong gawin?",
   },
   taskSeePriorities: {
-    en: "See Priority Barangays",
-    fil: "Tingnan ang Priyoridad ng Barangay",
+    en: "Review Barangay Assessments",
+    fil: "Suriin ang Barangay Assessments",
   },
   taskSeePrioritiesDesc: {
-    en: "Identify which communities need immediate preparation",
-    fil: "Tukuyin kung aling komunidad ang unang kailangang maghanda",
+    en: "Review risk categories, supporting evidence, and data gaps",
+    fil: "Suriin ang risk categories, supporting evidence, at data gaps",
   },
   taskViewBarangayInfo: {
     en: "View Barangay Information",
     fil: "Tingnan ang Impormasyon ng Barangay",
   },
   taskViewBarangayInfoDesc: {
-    en: "Check baseline demographics and evacuation centers",
-    fil: "Suriin ang populasyon at mga evacuation center",
+    en: "Review available baseline demographics, facilities, and data gaps",
+    fil: "Suriin ang available na baseline demographics, facilities, at data gaps",
   },
   taskCreateBrief: {
     en: "Create Preparedness Brief",
     fil: "Gumawa ng Buod ng Paghahanda",
   },
   taskCreateBriefDesc: {
-    en: "Generate action checklist for responders",
-    fil: "Bumuo ng listahan ng hakbang para sa mga responder",
+    en: "Prepare a source-anchored responder brief from verified data",
+    fil: "Maghanda ng source-anchored responder brief mula sa beripikadong data",
   },
   taskCreateActionCard: {
     en: "Create Household Action Card",
     fil: "Gumawa ng Gabay sa Tahanan",
   },
   taskCreateActionCardDesc: {
-    en: "Family go-bag and safety instructions",
-    fil: "Laman ng Go-Bag at mga paalala sa kaligtasan ng pamilya",
+    en: "Use household code, quick profile, or barangay-only preparedness mode",
+    fil: "Gamitin ang household code, quick profile, o barangay-only preparedness mode",
   },
 
   // Priority Barangays
@@ -117,12 +117,12 @@ const translations: Record<string, { en: string; fil: string }> = {
     fil: "Mga Barangay na Nangangailangan ng Atensyon",
   },
   basedOnVerifiedAdvisory: {
-    en: "Based on the current verified advisory.",
-    fil: "Batay sa kasalukuyang beripikadong babala.",
+    en: "Uses verified advisory and assessment data when available.",
+    fil: "Gumagamit ng verified advisory at assessment data kapag available.",
   },
   topPriorityBarangays: {
-    en: "Top Priority Barangays",
-    fil: "Mga Nangungunang Barangay",
+    en: "Barangays for Review",
+    fil: "Mga Barangay para sa Review",
   },
   viewAllBarangays: {
     en: "View All Barangays",
@@ -133,7 +133,7 @@ const translations: Record<string, { en: string; fil: string }> = {
     fil: "Ipakita Lamang ang Nangunguna",
   },
   why: { en: "Why?", fil: "Bakit?" },
-  backToPrepare: { en: "Back to Preparedness", fil: "Bumalik sa Paghahanda" },
+  backToPrepare: { en: "Back to Prepare", fil: "Bumalik sa Paghahanda" },
 
   // Barangay Detail
   whyDoesBarangayNeedAttention: {
@@ -145,46 +145,46 @@ const translations: Record<string, { en: string; fil: string }> = {
   criticalFacilities: { en: "Critical Facilities", fil: "Mahalagang Pasilidad" },
   preparednessGap: { en: "Preparedness Gap", fil: "Kulang sa Kahandaan" },
   viewFullScore: {
-    en: "View Full Score Explanation",
-    fil: "Tingnan ang Buong Paliwanag sa Score",
+    en: "View Assessment Explanation",
+    fil: "Tingnan ang Paliwanag ng Assessment",
   },
   hideScore: {
-    en: "Hide Score Explanation",
-    fil: "Itago ang Paliwanag",
+    en: "Hide Assessment Explanation",
+    fil: "Itago ang Paliwanag ng Assessment",
   },
 
   // Report Damage
   reportDamageTitle: {
-    en: "Report Damage & Needs",
-    fil: "Mag-ulat ng Pinsala at Pangangailangan",
+    en: "Damage & Needs Report",
+    fil: "Ulat ng Pinsala at Pangangailangan",
   },
   next: { en: "Next", fil: "Susunod" },
   back: { en: "Back", fil: "Bumalik" },
-  submitReport: { en: "Submit Report", fil: "Ipasa ang Ulat" },
+  submitReport: { en: "Save Report", fil: "I-save ang Ulat" },
   reportSubmittedSuccess: {
-    en: "Report submitted successfully to Lucena CDRRMO EOC.",
-    fil: "Matagumpay na naipasa ang ulat sa Lucena CDRRMO EOC.",
+    en: "Report saved locally as Pending Sync. It remains unverified.",
+    fil: "Na-save locally ang ulat bilang Pending Sync. Nananatili itong unverified.",
   },
 
-  // Recovery
-  recoveryTitle: { en: "Recovery Priorities", fil: "Priyoridad sa Pagbangon" },
+  // Post Impact
+  recoveryTitle: { en: "Post Impact Action Card", fil: "Post Impact Action Card" },
   recoverySubtitle: {
-    en: "Based on verified damage and needs reports.",
-    fil: "Batay sa mga beripikadong ulat ng pinsala at pangangailangan.",
+    en: "Review reported and validated impacts, data gaps, and source-anchored LGU actions.",
+    fil: "Suriin ang reported at validated impacts, data gaps, at source-anchored LGU actions.",
   },
-  mainReason: { en: "Main reason:", fil: "Pangunahing dahilan:" },
+  mainReason: { en: "Why it needs review:", fil: "Bakit kailangan ng review:" },
   viewDetails: { en: "View Details", fil: "Tingnan ang Detalye" },
-  howCalculated: { en: "How was this calculated?", fil: "Paano ito kinalkula?" },
+  howCalculated: { en: "How was this assessed?", fil: "Paano ito in-assess?" },
 
-  // Priority Levels
-  priorityVeryHigh: { en: "VERY HIGH PRIORITY", fil: "NAPAKATAAS NA PRIYORIDAD" },
-  priorityHigh: { en: "HIGH PRIORITY", fil: "MATAAS NA PRIYORIDAD" },
-  priorityModerate: { en: "MODERATE", fil: "KATAMTAMAN" },
-  priorityLow: { en: "LOWER", fil: "MABABANG PRIYORIDAD" },
+  // Deterministic Risk Categories
+  priorityVeryHigh: { en: "VERY HIGH RISK", fil: "NAPAKATAAS NA PANGANIB" },
+  priorityHigh: { en: "HIGH RISK", fil: "MATAAS NA PANGANIB" },
+  priorityModerate: { en: "MODERATE RISK", fil: "KATAMTAMANG PANGANIB" },
+  priorityLow: { en: "LOW RISK", fil: "MABABANG PANGANIB" },
 
   // General Actions
   close: { en: "Close", fil: "Isara" },
-  activeAdvisoryBadge: { en: "1 Active Advisory", fil: "1 Aktibong Babala" },
+  activeAdvisoryBadge: { en: "Advisory Status", fil: "Status ng Advisory" },
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);

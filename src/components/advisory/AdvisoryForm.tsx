@@ -10,6 +10,11 @@ export interface AdvisoryFormValues {
   status: "ACTIVE" | "MONITORING" | "ENDED";
   issuedTime: string;
   bulletinNumber: string;
+  validity: string;
+  affectedLocations: string;
+  warningInformation: string;
+  sourceUrl: string;
+  verificationState: "UNVERIFIED" | "FOR_REVIEW" | "VERIFIED";
   message: string;
   precautions: string[];
 }
@@ -26,6 +31,11 @@ const DEFAULT_VALUES: AdvisoryFormValues = {
   status: "ACTIVE",
   issuedTime: "",
   bulletinNumber: "",
+  validity: "",
+  affectedLocations: "",
+  warningInformation: "",
+  sourceUrl: "",
+  verificationState: "UNVERIFIED",
   message: "",
   precautions: [""],
 };
@@ -58,7 +68,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
               "Record only verified information issued by PAGASA, DOST, Lucena CDRRMO, or another authorized source.",
             verificationTitle: "Verification required",
             verificationBody:
-              "Project AGAP does not generate disaster advisories. Confirm the source, bulletin reference, and issued time before saving.",
+              "Project AGAP does not generate disaster advisories. Confirm the issuing agency, bulletin reference, issued time, validity, affected locations, source link, and verification state before saving.",
             titleLabel: "Advisory title",
             titlePlaceholder: "e.g. Severe Rainfall Advisory",
             sourceLabel: "Issuing source",
@@ -68,6 +78,19 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             issuedPlaceholder: "e.g. Updated 11:00 AM Today",
             bulletinLabel: "Bulletin / reference number",
             bulletinPlaceholder: "e.g. Bulletin #4",
+            validityLabel: "Validity / effective period",
+            validityPlaceholder: "e.g. Valid until 2:00 PM, 9 Sep 2026",
+            affectedLocationsLabel: "Affected locations",
+            affectedLocationsPlaceholder:
+              "Enter only locations explicitly identified by the issuing source.",
+            warningInformationLabel: "Warning information",
+            warningInformationPlaceholder:
+              "Enter the warning level, classification, rainfall range, wind signal, or other source-issued warning information.",
+            sourceUrlLabel: "Official source link",
+            sourceUrlPlaceholder: "https://...",
+            verificationStateLabel: "Verification state",
+            verificationStateHelp:
+              "This field records review state only. Backend authorization must determine who may mark an advisory VERIFIED.",
             messageLabel: "Main advisory message",
             messagePlaceholder: "Enter the verified advisory summary...",
             precautionsLabel: "Key directives / precautions",
@@ -77,8 +100,9 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             save: "Save advisory",
             saving: "Saving...",
             localSuccess:
-              "Advisory validated locally. Backend publishing is not connected yet.",
+              "Advisory saved in the frontend only. Backend validation and publishing are not connected yet.",
             required: "This field is required.",
+            invalidUrl: "Enter a valid http:// or https:// source link.",
             precautionRequired: "Add at least one directive or precaution.",
           }
         : {
@@ -88,7 +112,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
               "Itala lamang ang beripikadong impormasyong inilabas ng PAGASA, DOST, Lucena CDRRMO, o ibang awtorisadong ahensya.",
             verificationTitle: "Kailangang beripikado",
             verificationBody:
-              "Hindi gumagawa ng sariling disaster advisory ang Project AGAP. Tiyakin ang pinagmulan, bulletin reference, at oras bago i-save.",
+              "Hindi gumagawa ng sariling disaster advisory ang Project AGAP. Tiyakin ang ahensyang naglabas, bulletin reference, oras ng paglabas, validity, mga apektadong lugar, source link, at verification state bago i-save.",
             titleLabel: "Pamagat ng babala",
             titlePlaceholder: "hal. Babala sa Malakas na Ulan",
             sourceLabel: "Ahensyang naglabas",
@@ -98,6 +122,19 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             issuedPlaceholder: "hal. Na-update 11:00 AM Ngayon",
             bulletinLabel: "Bulletin / reference number",
             bulletinPlaceholder: "hal. Bulletin #4",
+            validityLabel: "Validity / panahon ng bisa",
+            validityPlaceholder: "hal. May bisa hanggang 2:00 PM, 9 Sep 2026",
+            affectedLocationsLabel: "Mga apektadong lugar",
+            affectedLocationsPlaceholder:
+              "Ilagay lamang ang mga lugar na tahasang tinukoy ng ahensyang naglabas.",
+            warningInformationLabel: "Impormasyon ng warning",
+            warningInformationPlaceholder:
+              "Ilagay ang warning level, classification, rainfall range, wind signal, o iba pang impormasyong inilabas ng source.",
+            sourceUrlLabel: "Opisyal na source link",
+            sourceUrlPlaceholder: "https://...",
+            verificationStateLabel: "Verification state",
+            verificationStateHelp:
+              "Itinatala lamang ng field na ito ang review state. Dapat tukuyin ng backend authorization kung sino ang maaaring magmarka bilang VERIFIED.",
             messageLabel: "Pangunahing mensahe",
             messagePlaceholder: "Ilagay ang beripikadong buod ng babala...",
             precautionsLabel: "Mga pangunahing tagubilin / pag-iingat",
@@ -107,8 +144,9 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             save: "I-save ang babala",
             saving: "Sine-save...",
             localSuccess:
-              "Na-validate ang advisory sa frontend. Hindi pa nakakonekta ang backend publishing.",
+              "Na-save lamang ang advisory sa frontend. Hindi pa nakakonekta ang backend validation at publishing.",
             required: "Kinakailangan ang field na ito.",
+            invalidUrl: "Maglagay ng valid na http:// o https:// source link.",
             precautionRequired: "Magdagdag ng kahit isang tagubilin o pag-iingat.",
           },
     [language]
@@ -152,6 +190,21 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
     if (!values.source.trim()) nextErrors.source = copy.required;
     if (!values.issuedTime.trim()) nextErrors.issuedTime = copy.required;
     if (!values.bulletinNumber.trim()) nextErrors.bulletinNumber = copy.required;
+    if (!values.validity.trim()) nextErrors.validity = copy.required;
+    if (!values.affectedLocations.trim()) nextErrors.affectedLocations = copy.required;
+    if (!values.warningInformation.trim()) nextErrors.warningInformation = copy.required;
+    if (!values.sourceUrl.trim()) {
+      nextErrors.sourceUrl = copy.required;
+    } else {
+      try {
+        const parsedUrl = new URL(values.sourceUrl.trim());
+        if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+          nextErrors.sourceUrl = copy.invalidUrl;
+        }
+      } catch {
+        nextErrors.sourceUrl = copy.invalidUrl;
+      }
+    }
     if (!values.message.trim()) nextErrors.message = copy.required;
     if (!values.precautions.some((item) => item.trim())) {
       nextErrors.precautions = copy.precautionRequired;
@@ -171,6 +224,10 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
       source: values.source.trim(),
       issuedTime: values.issuedTime.trim(),
       bulletinNumber: values.bulletinNumber.trim(),
+      validity: values.validity.trim(),
+      affectedLocations: values.affectedLocations.trim(),
+      warningInformation: values.warningInformation.trim(),
+      sourceUrl: values.sourceUrl.trim(),
       message: values.message.trim(),
       precautions: values.precautions.map((item) => item.trim()).filter(Boolean),
     };
@@ -264,6 +321,80 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
               placeholder={copy.bulletinPlaceholder}
               className={inputClass(Boolean(errors.bulletinNumber))}
               aria-invalid={Boolean(errors.bulletinNumber)}
+            />
+          </Field>
+
+          <Field label={copy.validityLabel} error={errors.validity}>
+            <input
+              value={values.validity}
+              onChange={(event) => updateField("validity", event.target.value)}
+              placeholder={copy.validityPlaceholder}
+              className={inputClass(Boolean(errors.validity))}
+              aria-invalid={Boolean(errors.validity)}
+            />
+          </Field>
+
+          <Field label={copy.verificationStateLabel}>
+            <select
+              value={values.verificationState}
+              onChange={(event) =>
+                updateField(
+                  "verificationState",
+                  event.target.value as AdvisoryFormValues["verificationState"]
+                )
+              }
+              className={inputClass(false)}
+            >
+              <option value="UNVERIFIED">UNVERIFIED</option>
+              <option value="FOR_REVIEW">FOR REVIEW</option>
+              <option value="VERIFIED">VERIFIED</option>
+            </select>
+            <span className="mt-1.5 block text-[11px] leading-relaxed text-slate-500">
+              {copy.verificationStateHelp}
+            </span>
+          </Field>
+
+          <Field
+            label={copy.affectedLocationsLabel}
+            error={errors.affectedLocations}
+            className="sm:col-span-2"
+          >
+            <textarea
+              value={values.affectedLocations}
+              onChange={(event) => updateField("affectedLocations", event.target.value)}
+              placeholder={copy.affectedLocationsPlaceholder}
+              className={`${inputClass(Boolean(errors.affectedLocations))} min-h-24 resize-y`}
+              aria-invalid={Boolean(errors.affectedLocations)}
+            />
+          </Field>
+
+          <Field
+            label={copy.warningInformationLabel}
+            error={errors.warningInformation}
+            className="sm:col-span-2"
+          >
+            <textarea
+              value={values.warningInformation}
+              onChange={(event) => updateField("warningInformation", event.target.value)}
+              placeholder={copy.warningInformationPlaceholder}
+              className={`${inputClass(Boolean(errors.warningInformation))} min-h-24 resize-y`}
+              aria-invalid={Boolean(errors.warningInformation)}
+            />
+          </Field>
+
+          <Field
+            label={copy.sourceUrlLabel}
+            error={errors.sourceUrl}
+            className="sm:col-span-2"
+          >
+            <input
+              type="url"
+              inputMode="url"
+              value={values.sourceUrl}
+              onChange={(event) => updateField("sourceUrl", event.target.value)}
+              placeholder={copy.sourceUrlPlaceholder}
+              className={inputClass(Boolean(errors.sourceUrl))}
+              aria-invalid={Boolean(errors.sourceUrl)}
             />
           </Field>
 

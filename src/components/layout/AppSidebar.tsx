@@ -20,20 +20,8 @@ export const AppSidebar: React.FC = () => {
     useNavigation();
   const { language, t } = useLanguage();
 
-  const getNavTitle = (item: NavItemConfig) => {
-    switch (item.id) {
-      case "home":
-        return language === "en" ? "Home" : "Tahanan";
-      case "prepare":
-        return language === "en" ? "Preparedness" : "Paghahanda";
-      case "report-damage":
-        return language === "en" ? "Damage & Needs" : "Pinsala at Pangangailangan";
-      case "recovery":
-        return language === "en" ? "Recovery Priorities" : "Mga Priyoridad sa Pagbangon";
-      default:
-        return language === "en" ? item.titleEn : item.titleFil;
-    }
-  };
+  const getNavTitle = (item: NavItemConfig) =>
+    language === "en" ? item.titleEn : item.titleFil;
 
   const getNavIcon = (iconName: string, isActive: boolean) => {
     const className = `w-5 h-5 shrink-0 transition-colors ${
@@ -123,16 +111,11 @@ export const AppSidebar: React.FC = () => {
         <button
           type="button"
           onClick={() => setIsHelpOpen(true)}
-          className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-900 text-xs font-medium transition-colors"
-          aria-label={`${t("help")} — 911`}
+          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-slate-50 hover:text-slate-900 text-xs font-medium transition-colors"
+          aria-label={t("help")}
         >
-          <div className="flex items-center gap-2">
-            <HelpCircle className="w-4 h-4 text-slate-400" aria-hidden="true" />
-            <span>{t("help")}</span>
-          </div>
-          <span className="text-[10px] font-bold text-red-700 bg-red-50 px-1.5 py-0.5 rounded border border-red-200">
-            911
-          </span>
+          <HelpCircle className="w-4 h-4 text-slate-400" aria-hidden="true" />
+          <span>{t("help")}</span>
         </button>
 
         <div className="flex items-center justify-between px-2 pt-1 border-t border-slate-100">

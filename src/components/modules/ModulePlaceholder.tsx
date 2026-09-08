@@ -4,18 +4,19 @@ import React, { useEffect, useState } from "react";
 import { useNavigation } from "@/context/NavigationContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { AdvisoryForm } from "@/components/advisory/AdvisoryForm";
+import { LGUActionCard } from "@/components/assessment/LGUActionCard";
+import { HouseholdActionCard } from "@/components/household/HouseholdActionCard";
+import { PostImpactActionCard } from "@/components/recovery/PostImpactActionCard";
+import { ConnectivityStatus } from "@/components/feedback/ConnectivityStatus";
 import {
   TOP_BARANGAYS,
   OTHER_BARANGAYS,
-  RECOVERY_PRIORITIES,
   CURRENT_OFFICIAL_ADVISORY,
-} from "@/lib/mock-data"
+} from "@/lib/mock-data";
 import {
   ArrowRight,
   ArrowLeft,
   Check,
-  ChevronDown,
-  ChevronUp,
   CheckCircle2,
   Radio,
   Shield,
@@ -27,7 +28,6 @@ export const ModulePlaceholder: React.FC = () => {
     prepareSubView,
     setPrepareSubView,
     selectedBarangay,
-    setSelectedBarangayId,
     goToPriorityBarangays,
     goToBarangayDetail,
     setIsAdvisoryModalOpen,
@@ -44,61 +44,30 @@ export const ModulePlaceholder: React.FC = () => {
     }
   }, [currentModule]);
 
-  // State for Priority Barangays View
-  const [showAllBarangays, setShowAllBarangays] = useState(false);
-
-  // State for Barangay Detail View
-  const [showScoreExplanation, setShowScoreExplanation] = useState(false);
-
-  // State for Report Damage Form (6 Steps)
+  // State for Damage & Needs Report (reported data only; validation remains backend/LGU controlled)
   const [reportStep, setReportStep] = useState(1);
-  const [selectedReportBarangay, setSelectedReportBarangay] = useState("Dalahican");
-  const [selectedIncident, setSelectedIncident] = useState("Severe Flooding / Storm Surge");
-  const [selectedSeverity, setSelectedSeverity] = useState("Severe / Urgent");
-  const [selectedNeeds, setSelectedNeeds] = useState<string[]>([
-    "Drinking Water",
-    "Food Packs",
-  ]);
+  const [selectedReportBarangay, setSelectedReportBarangay] = useState("");
+  const [selectedIncident, setSelectedIncident] = useState("");
+  const [selectedSeverity, setSelectedSeverity] = useState("");
+  const [reportedAffectedPersons, setReportedAffectedPersons] = useState("");
+  const [reportedAffectedHouseholds, setReportedAffectedHouseholds] = useState("");
+  const [reportedVulnerableGroups, setReportedVulnerableGroups] = useState("");
+  const [damageSummary, setDamageSummary] = useState("");
+  const [criticalFacilityCondition, setCriticalFacilityCondition] = useState("");
+  const [serviceDisruption, setServiceDisruption] = useState("");
+  const [accessibilityConstraints, setAccessibilityConstraints] = useState("");
+  const [selectedNeeds, setSelectedNeeds] = useState<string[]>([]);
+  const [reportSourceReference, setReportSourceReference] = useState("");
   const [photoNote, setPhotoNote] = useState("");
+  const [evidenceFileName, setEvidenceFileName] = useState<string | null>(null);
   const [isReportSubmitted, setIsReportSubmitted] = useState(false);
+  const [pendingReportId, setPendingReportId] = useState<string | null>(null);
+  const [pendingReportTimestamp, setPendingReportTimestamp] = useState<string | null>(null);
 
-  // State for Recovery View
-  const [showRecoveryFormula, setShowRecoveryFormula] = useState(false);
-  const [selectedRecoveryDetail, setSelectedRecoveryDetail] = useState<number | null>(null);
-
-  // --- Priority Badge Helper ---
-  const renderPriorityBadge = (
-    level: "VERY HIGH" | "HIGH" | "MODERATE" | "LOW" | string,
-    levelFil: string
-  ) => {
-    const text = language === "en" ? level : levelFil;
-    switch (level) {
-      case "VERY HIGH":
-        return (
-          <span className="text-xs font-bold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded">
-            {text}
-          </span>
-        );
-      case "HIGH":
-        return (
-          <span className="text-xs font-bold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded">
-            {text}
-          </span>
-        );
-      case "MODERATE":
-        return (
-          <span className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
-            {text}
-          </span>
-        );
-      case "LOW":
-        return (
-          <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
-            {text}
-          </span>
-        );
-    }
-  };
+  // State for Post Impact Action Card. The initial selection is navigation only, not an impact claim.
+  const [selectedPostImpactBarangay, setSelectedPostImpactBarangay] = useState(
+    TOP_BARANGAYS[0]?.name ?? OTHER_BARANGAYS[0]?.name ?? ""
+  );
 
   // =========================================================================
   // VIEW 1: DASHBOARD
@@ -145,8 +114,8 @@ export const ModulePlaceholder: React.FC = () => {
             </h1>
             <p className="mt-2 text-sm sm:text-base leading-relaxed text-slate-500">
               {language === "en"
-                ? "A calm overview of current advisories and verified risk information for Lucena City responders."
-                : "Isang malinaw na buod ng kasalukuyang abiso at beripikadong impormasyon sa panganib para sa mga responder ng Lungsod ng Lucena."}
+                ? "A calm operational overview of advisories, verified assessment data, connectivity, and data freshness for Lucena City responders."
+                : "Isang malinaw na operational overview ng mga abiso, beripikadong assessment data, koneksyon, at pagiging napapanahon ng datos para sa mga responder ng Lungsod ng Lucena."}
             </p>
           </div>
         </header>
@@ -193,6 +162,15 @@ export const ModulePlaceholder: React.FC = () => {
             </div>
           </div>
         </section>
+
+        {/* Connectivity and data-freshness status.
+            Browser online/offline state is detected by the frontend.
+            Authoritative sync/freshness/conflict values stay empty until the backend supplies them. */}
+        <ConnectivityStatus
+          lastSyncAt={null}
+          advisoryValidity={null}
+          pendingSyncCount={0}
+        />
 
         {/* Visual-first overview. No sample series are plotted while verified data is unavailable. */}
         <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.75fr)]">
@@ -254,32 +232,44 @@ export const ModulePlaceholder: React.FC = () => {
             </div>
           </div>
 
-          {/* Priority-score visualization remains empty until verified scoring data is available */}
+          {/* Deterministic CDRA-informed risk result. No arbitrary 0–100 score is shown. */}
           <aside className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
             <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">
-              {language === "en" ? "Priority Score" : "Priority Score"}
+              {language === "en" ? "Risk Assessment" : "Pagtatasa ng Panganib"}
             </span>
             <h2 className="mt-1 text-base font-bold text-slate-900">
-              {language === "en" ? "Explainable Priority" : "Paliwanag sa Priyoridad"}
+              {language === "en" ? "Deterministic Risk Result" : "Deterministikong Resulta ng Panganib"}
             </h2>
+            <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
+              {language === "en"
+                ? "AGAP will display the documented methodology result only after verified likelihood, severity, evidence, and methodology records are connected."
+                : "Ipapakita lamang ng AGAP ang resulta ng dokumentadong metodolohiya kapag nakakonekta na ang beripikadong likelihood, severity, ebidensya, at methodology records."}
+            </p>
 
-            <div className="mt-7 flex justify-center">
-              <div className="flex h-36 w-36 items-center justify-center rounded-full border-[10px] border-slate-100 bg-slate-50/60">
-                <div className="text-center">
-                  <span className="block text-4xl font-black tracking-tight text-slate-300">--</span>
-                  <span className="mt-1 block text-[10px] font-bold uppercase tracking-wider text-slate-400">/ 100</span>
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              {[
+                [language === "en" ? "Likelihood" : "Likelihood", "—"],
+                [language === "en" ? "Severity" : "Severity", "—"],
+                [language === "en" ? "Risk Result" : "Risk Result", "—"],
+                [language === "en" ? "Relative Vulnerability" : "Relative Vulnerability", "—"],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+                  <span className="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+                    {label}
+                  </span>
+                  <span className="mt-1 block text-sm font-bold text-slate-700">{value}</span>
                 </div>
-              </div>
+              ))}
             </div>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm font-bold text-slate-800">
-                {language === "en" ? "No barangay score available" : "Wala pang available na score ng barangay"}
+            <div className="mt-5 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-4">
+              <p className="text-xs font-bold text-slate-700">
+                {language === "en" ? "Awaiting verified assessment inputs" : "Naghihintay ng beripikadong assessment inputs"}
               </p>
-              <p className="mx-auto mt-1.5 max-w-xs text-xs leading-relaxed text-slate-500">
+              <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
                 {language === "en"
-                  ? "When verified scoring data becomes available, this panel will explain why a barangay is prioritized."
-                  : "Kapag available na ang beripikadong scoring data, ipapaliwanag dito kung bakit prayoridad ang isang barangay."}
+                  ? "Methodology source, assessment date, evidence, verification state, confidence, and limitations will appear here when provided by the backend."
+                  : "Lalabas dito ang methodology source, assessment date, ebidensya, verification state, confidence, at limitations kapag ibinigay na ng backend."}
               </p>
             </div>
           </aside>
@@ -401,227 +391,183 @@ export const ModulePlaceholder: React.FC = () => {
   };
 
   // =========================================================================
-  // VIEW 3: PRIORITY BARANGAYS PAGE
+  // VIEW 3: BARANGAY RISK ASSESSMENT PAGE
   // =========================================================================
   const renderPriorityBarangaysView = () => {
-    const listToDisplay = showAllBarangays
-      ? [...TOP_BARANGAYS, ...OTHER_BARANGAYS]
-      : TOP_BARANGAYS;
+    const barangayProfiles = [...TOP_BARANGAYS, ...OTHER_BARANGAYS];
 
     return (
       <div className="space-y-6 animate-in fade-in duration-200">
-        {/* Back Link & Header */}
         <div>
           <button
             type="button"
             onClick={() => setPrepareSubView("menu")}
-            className="text-xs font-semibold text-slate-500 hover:text-slate-900 flex items-center gap-1 mb-2"
+            className="mb-2 flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             <span>{t("backToPrepare")}</span>
           </button>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-            {t("barangaysNeedingAttention")}
+
+          <h1 className="text-2xl font-black tracking-tight text-slate-900">
+            {language === "en" ? "Barangay Risk Assessment" : "Pagtatasa ng Panganib ng Barangay"}
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {t("basedOnVerifiedAdvisory")}
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
+            {language === "en"
+              ? "Risk results must come from the documented CDRA-informed methodology. No arbitrary 0–100 score is displayed while verified likelihood, severity, evidence, and methodology inputs are unavailable."
+              : "Ang risk result ay dapat manggaling sa dokumentadong CDRA-informed methodology. Walang arbitraryong 0–100 score na ipinapakita habang wala pa ang beripikadong likelihood, severity, ebidensya, at methodology inputs."}
           </p>
         </div>
 
-        {/* Clean, Simple Ranked List */}
-        <div className="divide-y divide-slate-100 bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          {listToDisplay.map((b) => (
-            <div
-              key={b.id}
-              className="p-4 sm:p-5 flex items-center justify-between gap-3 hover:bg-slate-50 transition-colors"
-            >
-              <div className="flex items-center gap-3.5 min-w-0">
-                <span className="font-mono text-sm font-bold text-slate-400 w-5 shrink-0">
-                  {b.rank}
-                </span>
+        <section className="rounded-2xl border border-slate-200 bg-white">
+          <div className="border-b border-slate-100 p-4 sm:p-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">
+                  {language === "en" ? "Barangay Assessment Queue" : "Barangay Assessment Queue"}
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {language === "en"
+                    ? "Open a barangay to review its deterministic assessment and LGU Action Card."
+                    : "Buksan ang barangay upang suriin ang deterministic assessment at LGU Action Card nito."}
+                </p>
+              </div>
+              <span className="self-start rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+                {language === "en" ? "Assessment data pending" : "Pending ang assessment data"}
+              </span>
+            </div>
+          </div>
+
+          <div className="divide-y divide-slate-100">
+            {barangayProfiles.map((b) => (
+              <div
+                key={b.id}
+                className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5"
+              >
                 <div className="min-w-0">
                   <button
                     type="button"
                     onClick={() => goToBarangayDetail(b.id)}
-                    className="text-sm sm:text-base font-bold text-slate-900 hover:text-blue-700 transition-colors text-left truncate block"
+                    className="block truncate text-left text-sm font-bold text-slate-900 transition-colors hover:text-blue-700 sm:text-base"
                   >
                     {b.name}
                   </button>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {language === "en"
+                      ? "Likelihood, severity, risk result, evidence, and methodology are not yet connected."
+                      : "Hindi pa nakakonekta ang likelihood, severity, risk result, ebidensya, at methodology."}
+                  </p>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-3 shrink-0">
-                {renderPriorityBadge(b.priorityLevel, b.priorityLevelFil)}
-                <span className="text-xs font-mono font-bold text-slate-500">
-                  {b.score} / 100
-                </span>
                 <button
                   type="button"
                   onClick={() => goToBarangayDetail(b.id)}
-                  className="px-3 py-1 text-xs font-semibold text-blue-700 hover:bg-blue-50 rounded-lg transition-colors border border-slate-200"
+                  className="inline-flex min-h-[38px] shrink-0 items-center justify-center gap-1.5 self-start rounded-lg border border-slate-200 px-3 py-2 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-50 sm:self-auto"
                 >
-                  {t("why")}
+                  <span>{language === "en" ? "Open LGU Action Card" : "Buksan ang LGU Action Card"}</span>
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </section>
 
-        {/* Optional: View All Barangays */}
-        <div className="text-center pt-2">
-          <button
-            type="button"
-            onClick={() => setShowAllBarangays(!showAllBarangays)}
-            className="text-xs font-bold text-slate-600 hover:text-slate-900 underline"
-          >
-            {showAllBarangays ? t("showTopOnly") : t("viewAllBarangays")}
-          </button>
+        <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs leading-relaxed text-blue-900">
+          <strong>{language === "en" ? "Frontend boundary:" : "Frontend boundary:"}</strong>{" "}
+          {language === "en"
+            ? "This interface does not calculate risk. The backend must provide the adopted methodology, verified inputs, deterministic result, evidence, date, confidence, and limitations."
+            : "Hindi kinakalkula ng interface na ito ang risk. Ang backend ang magbibigay ng adopted methodology, verified inputs, deterministic result, ebidensya, petsa, confidence, at limitations."}
         </div>
       </div>
     );
   };
 
   // =========================================================================
-  // VIEW 4: BARANGAY DETAIL PAGE
+  // VIEW 4: LGU ACTION CARD
   // =========================================================================
   const renderBarangayDetailView = () => {
     const b = selectedBarangay;
+    const assessment = b.riskAssessment;
+    const advisory = CURRENT_OFFICIAL_ADVISORY;
 
     return (
-      <div className="space-y-8 animate-in fade-in duration-200">
-        {/* Back Link & Header */}
+      <div className="space-y-6 animate-in fade-in duration-200">
         <div>
           <button
             type="button"
             onClick={() => setPrepareSubView("priority-barangays")}
-            className="text-xs font-semibold text-slate-500 hover:text-slate-900 flex items-center gap-1 mb-2"
+            className="mb-2 flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>{language === "en" ? "Back to Priority List" : "Bumalik sa Listahan"}</span>
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>
+              {language === "en"
+                ? "Back to Risk Assessments"
+                : "Bumalik sa Risk Assessments"}
+            </span>
           </button>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight uppercase">
-              BARANGAY {b.name}
+
+          <div className="max-w-3xl">
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">
+              {language === "en"
+                ? "Pre-Disaster Decision Support"
+                : "Pre-Disaster Decision Support"}
+            </span>
+            <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
+              {language === "en" ? "Barangay Review" : "Pagsusuri ng Barangay"}
             </h1>
-            <div className="flex items-center gap-2">
-              {renderPriorityBadge(b.priorityLevel, b.priorityLevelFil)}
-              <span className="text-sm font-mono font-bold text-slate-700">
-                {b.score} / 100
-              </span>
-            </div>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">
+              {language === "en"
+                ? "The LGU Action Card combines the verified advisory, deterministic risk assessment, potential population exposure, preparedness capacity, evidence, data gaps, and source-anchored recommendations. Missing backend values remain visibly empty."
+                : "Pinagsasama ng LGU Action Card ang beripikadong advisory, deterministic risk assessment, potential population exposure, preparedness capacity, ebidensya, data gaps, at source-anchored recommendations. Mananatiling malinaw na walang laman ang mga value na hindi pa ibinibigay ng backend."}
+            </p>
           </div>
         </div>
 
-        {/* Section 1: Why does this barangay need attention? */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 space-y-4">
-          <h2 className="text-sm font-bold text-slate-900">
-            {t("whyDoesBarangayNeedAttention")}
-          </h2>
+        <LGUActionCard
+          barangayName={b.name}
+          hazard={null}
+          advisory={{
+            title: language === "en" ? advisory.titleEn : advisory.titleFil,
+            reference: advisory.bulletinNumber,
+            issuedAt: advisory.issuedTime,
+            validity: null,
+            verificationState: "UNVERIFIED",
+          }}
+          assessment={{
+            likelihood: assessment.likelihood,
+            severity: assessment.severity,
+            riskResult: assessment.riskResult,
+            relativeVulnerability: assessment.relativeVulnerability,
+            methodology: assessment.methodology,
+            assessmentDate: assessment.assessmentDate,
+            verificationState: assessment.verificationState,
+          }}
+          exposure={{
+            estimatedPersons: null,
+            estimatedHouseholds: null,
+            vulnerableGroups: null,
+            estimationMethod: null,
+            confidenceLevel: assessment.confidenceLevel,
+            source: null,
+            referenceDate: null,
+            generatedAt: null,
+          }}
+          capacity={{
+            recordedCapacity: null,
+            potentialCapacityGap: null,
+            criticalFacilityReadiness: null,
+            communicationCapability: null,
+          }}
+          evidence={assessment.evidence}
+          dataGaps={assessment.limitations}
+          recommendations={[]}
+          onGenerateBrief={() => setPrepareSubView("prep-brief")}
+        />
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-            <div className="p-3 bg-slate-50 rounded-xl">
-              <span className="text-slate-400 block text-[11px]">
-                {t("hazardExposure")}
-              </span>
-              <span className="font-bold text-slate-800 text-sm mt-0.5 block">
-                {b.hazardExposure}
-              </span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl">
-              <span className="text-slate-400 block text-[11px]">
-                {t("vulnerablePopulation")}
-              </span>
-              <span className="font-bold text-slate-800 text-sm mt-0.5 block">
-                {b.vulnerablePopulation}
-              </span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl">
-              <span className="text-slate-400 block text-[11px]">
-                {t("criticalFacilities")}
-              </span>
-              <span className="font-bold text-slate-800 text-sm mt-0.5 block">
-                {b.criticalFacilities}
-              </span>
-            </div>
-            <div className="p-3 bg-slate-50 rounded-xl">
-              <span className="text-slate-400 block text-[11px]">
-                {t("preparednessGap")}
-              </span>
-              <span className="font-bold text-slate-800 text-sm mt-0.5 block">
-                {b.preparednessGap}
-              </span>
-            </div>
-          </div>
-
-          <p className="text-xs text-slate-600 leading-relaxed pt-1">
-            {language === "en" ? b.mainReasonEn : b.mainReasonFil}
-          </p>
-
-          {/* Full Score Explanation (Collapsible) */}
-          <div className="pt-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setShowScoreExplanation(!showScoreExplanation)}
-              className="text-xs font-bold text-blue-700 hover:underline flex items-center gap-1"
-            >
-              <span>
-                {showScoreExplanation ? t("hideScore") : t("viewFullScore")}
-              </span>
-              {showScoreExplanation ? (
-                <ChevronUp className="w-3.5 h-3.5" />
-              ) : (
-                <ChevronDown className="w-3.5 h-3.5" />
-              )}
-            </button>
-
-            {showScoreExplanation && (
-              <div className="mt-3 p-4 bg-slate-50 rounded-xl text-xs text-slate-600 space-y-2 animate-in fade-in duration-150">
-                <p>
-                  <strong>Score Calculation (82/100):</strong> Hazard exposure (35%) +
-                  Vulnerability density (30%) + Facility proximity (20%) + Resource gap (15%).
-                </p>
-                <p>
-                  Data verified from PAGASA storm surge bulletin #4 and Lucena City 2024 local census records.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Section 2: What would you like to do? */}
-        <div>
-          <h2 className="text-sm font-bold text-slate-900 mb-3">
-            {t("whatWouldYouLikeToDo")}
-          </h2>
-
-          <div className="space-y-2.5">
-            <button
-              type="button"
-              onClick={() => setPrepareSubView("prep-brief")}
-              className="w-full p-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold text-left transition-colors flex items-center justify-between"
-            >
-              <span>{t("taskCreateBrief")}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setPrepareSubView("barangay-info")}
-              className="w-full p-4 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold text-left transition-colors flex items-center justify-between"
-            >
-              <span>{t("taskViewBarangayInfo")}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setPrepareSubView("action-card")}
-              className="w-full p-4 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-xs font-bold text-left transition-colors flex items-center justify-between"
-            >
-              <span>{t("taskCreateActionCard")}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+        <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs leading-relaxed text-blue-900">
+          <strong>{language === "en" ? "Integration boundary:" : "Integration boundary:"}</strong>{" "}
+          {language === "en"
+            ? "This screen only presents values supplied by the application data layer. Risk computation, exposure estimation, capacity-gap calculation, validation, action-rule matching, assignments, overrides, and audit logging remain backend responsibilities."
+            : "Ipinapakita lamang ng screen na ito ang mga value na ibinibigay ng application data layer. Backend responsibility pa rin ang risk computation, exposure estimation, capacity-gap calculation, validation, action-rule matching, assignments, overrides, at audit logging."}
         </div>
       </div>
     );
@@ -639,60 +585,68 @@ export const ModulePlaceholder: React.FC = () => {
           <button
             type="button"
             onClick={() => setPrepareSubView("menu")}
-            className="text-xs font-semibold text-slate-500 hover:text-slate-900 flex items-center gap-1 mb-2"
+            className="mb-2 flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             <span>{t("backToPrepare")}</span>
           </button>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+
+          <h1 className="text-2xl font-black tracking-tight text-slate-900">
             {language === "en" ? "Preparedness Brief" : "Buod ng Paghahanda"}
           </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Barangay {b.name} • Priority Score {b.score}/100
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">
+            {language === "en"
+              ? `Barangay ${b.name} • Brief content remains unavailable until verified advisory, deterministic assessment, and approved action-rule data are connected.`
+              : `Barangay ${b.name} • Mananatiling unavailable ang brief content hangga't hindi nakakonekta ang verified advisory, deterministic assessment, at approved action-rule data.`}
           </p>
         </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 space-y-4">
-          <div className="p-3.5 bg-blue-50 rounded-xl border border-blue-200 text-xs text-blue-900 font-medium">
-            {language === "en" ? b.recommendedActionEn : b.recommendedActionFil}
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            {[
+              {
+                en: "Verified Advisory",
+                fil: "Beripikadong Advisory",
+              },
+              {
+                en: "Risk Assessment",
+                fil: "Risk Assessment",
+              },
+              {
+                en: "Approved Responder Actions",
+                fil: "Approved Responder Actions",
+              },
+            ].map((item) => (
+              <div
+                key={item.en}
+                className="rounded-xl border border-slate-200 bg-slate-50/70 p-4"
+              >
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {language === "en" ? item.en : item.fil}
+                </span>
+                <p className="mt-2 text-xs font-semibold text-slate-700">
+                  {language === "en"
+                    ? "Awaiting verified backend data"
+                    : "Naghihintay ng beripikadong backend data"}
+                </p>
+              </div>
+            ))}
           </div>
 
-          <div className="space-y-2">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              {language === "en" ? "Responder Prepositioning Checklist" : "Listahan ng Ihahandang Gamit"}
-            </h3>
-            <div className="space-y-2 text-xs text-slate-700">
-              <label className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
-                <input type="checkbox" defaultChecked className="rounded text-blue-600" />
-                <span>Preposition 2 rescue boats at Landing Zone Alpha</span>
-              </label>
-              <label className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
-                <input type="checkbox" defaultChecked className="rounded text-blue-600" />
-                <span>Verify evacuation generator fuel at {b.evacuationCenter}</span>
-              </label>
-              <label className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 cursor-pointer">
-                <input type="checkbox" className="rounded text-blue-600" />
-                <span>Confirm radio comms with Lucena CDRRMO EOC frequency</span>
-              </label>
-            </div>
+          <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs leading-relaxed text-blue-900">
+            {language === "en"
+              ? "AGAP will not invent responder checklists, evacuation instructions, equipment quantities, or facility-readiness claims. The brief must be assembled from verified advisory data and approved action rules supplied by the application data layer."
+              : "Hindi gagawa ang AGAP ng pekeng responder checklist, evacuation instruction, dami ng kagamitan, o facility-readiness claim. Dapat buuin ang brief mula sa verified advisory data at approved action rules na ibinibigay ng application data layer."}
           </div>
-
-          <div className="pt-4 border-t border-slate-100 flex justify-end">
-            <button
-              type="button"
-              onClick={() => alert("Printable brief generated for Barangay Tanods.")}
-              className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 transition-colors"
-            >
-              {language === "en" ? "Print / Export Brief" : "I-print ang Buod"}
-            </button>
-          </div>
-        </div>
+        </section>
       </div>
     );
   };
 
   const renderHouseholdActionCardView = () => {
-    const b = selectedBarangay;
+    const barangayNames = [...TOP_BARANGAYS, ...OTHER_BARANGAYS].map(
+      (barangay) => barangay.name
+    );
 
     return (
       <div className="space-y-6 animate-in fade-in duration-200">
@@ -700,53 +654,39 @@ export const ModulePlaceholder: React.FC = () => {
           <button
             type="button"
             onClick={() => setPrepareSubView("menu")}
-            className="text-xs font-semibold text-slate-500 hover:text-slate-900 flex items-center gap-1 mb-2"
+            className="mb-2 flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900"
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             <span>{t("backToPrepare")}</span>
           </button>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-            {language === "en" ? "Household Action Card" : "Gabay sa Tahanan"}
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {language === "en"
-              ? "Simple instructions for families in Barangay " + b.name
-              : "Malinaw na gabay para sa bawat pamilya sa Barangay " + b.name}
-          </p>
-        </div>
 
-        <div className="bg-white rounded-2xl border border-slate-200 p-5 sm:p-6 space-y-5">
-          <div className="space-y-2">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              {language === "en" ? "1. Designated Evacuation Center" : "1. Itinalagang Evacuation Center"}
-            </h3>
-            <p className="text-xs font-bold text-slate-800 bg-slate-50 p-3 rounded-xl border border-slate-200">
-              {b.evacuationCenter}
+          <div className="max-w-3xl">
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">
+              {language === "en"
+                ? "Public Preparedness Flow"
+                : "Pampublikong Daloy ng Paghahanda"}
+            </span>
+            <p className="mt-1 text-xs leading-relaxed text-slate-500">
+              {language === "en"
+                ? "The Household Action Card supports a pseudonymous household code, a quick household profile, or a generic barangay-only flow. Backend action-rule matching is intentionally not simulated in the frontend."
+                : "Sinusuportahan ng Household Action Card ang pseudonymous household code, quick household profile, o generic barangay-only flow. Hindi kunwaring ginagawa ng frontend ang backend action-rule matching."}
             </p>
           </div>
+        </div>
 
-          <div className="space-y-2">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              {language === "en" ? "2. Essential Family Go-Bag" : "2. Laman ng Family Go-Bag"}
-            </h3>
-            <ul className="text-xs text-slate-600 space-y-1.5 list-disc list-inside">
-              <li>Drinking water (1 gallon per person for 3 days)</li>
-              <li>Ready-to-eat canned goods and biscuits</li>
-              <li>Flashlight, extra batteries, and whistle</li>
-              <li>Important documents in waterproof plastic envelope</li>
-              <li>First aid kit and maintenance medicines</li>
-            </ul>
-          </div>
+        <HouseholdActionCard
+          barangays={barangayNames}
+          initialBarangay={selectedBarangay.name}
+          output={null}
+        />
 
-          <div className="pt-4 border-t border-slate-100 flex justify-end">
-            <button
-              type="button"
-              onClick={() => alert("Action Card ready for distribution.")}
-              className="px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              {language === "en" ? "Print Action Card" : "I-print ang Gabay"}
-            </button>
-          </div>
+        <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs leading-relaxed text-blue-900">
+          <strong>
+            {language === "en" ? "Integration boundary:" : "Integration boundary:"}
+          </strong>{" "}
+          {language === "en"
+            ? "Household lookup, approved action-rule matching, controlled explanation generation, cached profile retrieval, and offline fallback data are backend or synchronization responsibilities. Until those handlers are connected, this frontend accepts the three required input modes but will not fabricate a Household Action Card result."
+            : "Backend o synchronization responsibility ang household lookup, approved action-rule matching, controlled explanation generation, cached profile retrieval, at offline fallback data. Hangga't hindi nakakonekta ang mga handler na iyon, tatanggapin ng frontend ang tatlong required input mode ngunit hindi ito gagawa ng pekeng Household Action Card result."}
         </div>
       </div>
     );
@@ -781,7 +721,7 @@ export const ModulePlaceholder: React.FC = () => {
                 {language === "en" ? "Total Population" : "Kabuuang Populasyon"}
               </span>
               <span className="font-bold text-slate-900 text-sm mt-0.5 block">
-                {b.population}
+                {b.population ?? "—"}
               </span>
             </div>
             <div className="p-3.5 bg-slate-50 rounded-xl">
@@ -789,7 +729,7 @@ export const ModulePlaceholder: React.FC = () => {
                 {language === "en" ? "Vulnerable Sector" : "Bulnerableng Sektor"}
               </span>
               <span className="font-bold text-slate-900 text-sm mt-0.5 block">
-                {b.vulnerableCount}
+                {b.vulnerableCount ?? "—"}
               </span>
             </div>
             <div className="p-3.5 bg-slate-50 rounded-xl">
@@ -797,7 +737,7 @@ export const ModulePlaceholder: React.FC = () => {
                 {language === "en" ? "Evacuation Site" : "Lugar ng Paglikas"}
               </span>
               <span className="font-bold text-slate-900 text-sm mt-0.5 block truncate">
-                {b.evacuationCenter}
+                {b.evacuationCenter ?? "—"}
               </span>
             </div>
           </div>
@@ -807,7 +747,7 @@ export const ModulePlaceholder: React.FC = () => {
               {language === "en" ? "Terrain & Exposure Profile" : "Anyo ng Lupa at Panganib"}
             </span>
             <p className="text-slate-600 leading-relaxed">
-              {language === "en" ? b.mainReasonEn : b.mainReasonFil}
+              {(language === "en" ? b.mainReasonEn : b.mainReasonFil) ?? (language === "en" ? "Awaiting verified exposure-profile data." : "Naghihintay ng beripikadong exposure-profile data.")}
             </p>
           </div>
         </div>
@@ -821,42 +761,117 @@ export const ModulePlaceholder: React.FC = () => {
   const renderReportDamageScreen = () => {
     if (isReportSubmitted) {
       return (
-        <div className="max-w-xl mx-auto py-8 text-center space-y-4 animate-in fade-in duration-200">
-          <div className="w-12 h-12 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-6 h-6" />
+        <div className="mx-auto max-w-xl space-y-5 py-6 animate-in fade-in duration-200">
+          <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-5 sm:p-6">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-700 ring-1 ring-blue-200">
+                <CheckCircle2 className="h-5 w-5" aria-hidden="true" />
+              </div>
+
+              <div className="min-w-0">
+                <span className="inline-flex rounded-full border border-blue-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-700">
+                  {language === "en" ? "Pending Sync" : "Pending Sync"}
+                </span>
+
+                <h2 className="mt-2 text-xl font-bold text-slate-900">
+                  {language === "en"
+                    ? "Report saved for synchronization"
+                    : "Naka-save ang ulat para sa synchronization"}
+                </h2>
+
+                <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+                  {language === "en"
+                    ? "This report is still UNVERIFIED. Pending Sync means it has not yet been confirmed as a synchronized or validated LGU record."
+                    : "UNVERIFIED pa rin ang ulat na ito. Ang Pending Sync ay nangangahulugang hindi pa ito kumpirmadong synchronized o validated LGU record."}
+                </p>
+              </div>
+            </div>
+
+            <dl className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-blue-100 bg-white p-3.5">
+                <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {language === "en" ? "Client Report ID" : "Client Report ID"}
+                </dt>
+                <dd className="mt-1 break-all text-xs font-semibold text-slate-800">
+                  {pendingReportId ?? "—"}
+                </dd>
+              </div>
+
+              <div className="rounded-xl border border-blue-100 bg-white p-3.5">
+                <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {language === "en" ? "Device Timestamp" : "Device Timestamp"}
+                </dt>
+                <dd className="mt-1 text-xs font-semibold text-slate-800">
+                  {pendingReportTimestamp ?? "—"}
+                </dd>
+              </div>
+
+              <div className="rounded-xl border border-blue-100 bg-white p-3.5">
+                <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {language === "en" ? "Sync Status" : "Sync Status"}
+                </dt>
+                <dd className="mt-1 text-xs font-bold text-blue-700">
+                  Pending Sync
+                </dd>
+              </div>
+
+              <div className="rounded-xl border border-blue-100 bg-white p-3.5">
+                <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {language === "en" ? "Verification State" : "Verification State"}
+                </dt>
+                <dd className="mt-1 text-xs font-bold text-amber-700">
+                  Unverified
+                </dd>
+              </div>
+            </dl>
           </div>
-          <h2 className="text-xl font-bold text-slate-900">
-            {language === "en" ? "Report Submitted" : "Naipasa ang Ulat"}
-          </h2>
-          <p className="text-xs text-slate-600 max-w-md mx-auto">
-            {t("reportSubmittedSuccess")}
-          </p>
-          <div className="pt-4">
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="text-xs leading-relaxed text-amber-900">
+              <strong>
+                {language === "en" ? "Frontend limitation:" : "Frontend limitation:"}
+              </strong>{" "}
+              {language === "en"
+                ? "This prototype currently stores only the visible pending state in React memory. IndexedDB persistence, upload to Supabase, reconnect synchronization, conflict handling, and LGU validation must be provided by the backend/synchronization layer. Reloading the page may clear this temporary frontend state."
+                : "Sa prototype na ito, React memory lamang ang kasalukuyang nagtatago ng nakikitang pending state. Ang IndexedDB persistence, upload sa Supabase, reconnect synchronization, conflict handling, at LGU validation ay dapat manggaling sa backend/synchronization layer. Maaaring mawala ang temporary frontend state kapag ni-reload ang page."}
+            </p>
+          </div>
+
+          <div className="flex justify-end">
             <button
               type="button"
               onClick={() => {
                 setIsReportSubmitted(false);
                 setReportStep(1);
+                setSelectedReportBarangay("");
+                setSelectedIncident("");
+                setSelectedSeverity("");
+                setReportedAffectedPersons("");
+                setReportedAffectedHouseholds("");
+                setReportedVulnerableGroups("");
+                setDamageSummary("");
+                setCriticalFacilityCondition("");
+                setServiceDisruption("");
+                setAccessibilityConstraints("");
+                setSelectedNeeds([]);
+                setReportSourceReference("");
+                setPhotoNote("");
+                setEvidenceFileName(null);
+                setPendingReportId(null);
+                setPendingReportTimestamp(null);
               }}
-              className="px-4 py-2 bg-slate-900 text-white text-xs font-bold rounded-lg hover:bg-slate-800 transition-colors"
+              className="rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-slate-800"
             >
-              {language === "en" ? "Submit Another Report" : "Magpasa ng Isa Pang Ulat"}
+              {language === "en" ? "Create Another Report" : "Gumawa ng Isa Pang Ulat"}
             </button>
           </div>
         </div>
       );
     }
 
-    const lucenaBarangays = [
-      "Dalahican",
-      "Cotta",
-      "Barra",
-      "Gulang-gulang",
-      "Ibabang Dupay",
-      "Mayao Crossing",
-      "Ransohan",
-      "Talao-Talao",
-    ];
+    const lucenaBarangays = [...TOP_BARANGAYS, ...OTHER_BARANGAYS].map(
+      (barangay) => barangay.name
+    );
 
     const incidentTypes = [
       "Severe Flooding / Storm Surge",
@@ -867,9 +882,13 @@ export const ModulePlaceholder: React.FC = () => {
     ];
 
     const severityLevels = [
-      { id: "Minor", label: "Minor", desc: "Passable, localized ponding" },
-      { id: "Moderate", label: "Moderate", desc: "Knee-deep water, needs clearing" },
-      { id: "Severe / Urgent", label: "Severe / Urgent", desc: "Life safety risk, evacuation required" },
+      { id: "Minor", label: "Minor", desc: "Localized impact reported; requires normal validation." },
+      { id: "Moderate", label: "Moderate", desc: "Significant local impact reported; requires LGU review." },
+      {
+        id: "Severe / Urgent",
+        label: "Severe / Urgent",
+        desc: "Potential life-safety concern reported; requires urgent authorized validation.",
+      },
     ];
 
     const needsOptions = [
@@ -881,15 +900,47 @@ export const ModulePlaceholder: React.FC = () => {
       "Temporary Shelter Tents",
     ];
 
+    const canAdvanceReport =
+      (reportStep === 1 && Boolean(selectedReportBarangay)) ||
+      (reportStep === 2 && Boolean(selectedIncident)) ||
+      (reportStep === 3 && Boolean(selectedSeverity) && Boolean(damageSummary.trim())) ||
+      reportStep === 4 ||
+      (reportStep === 5 && Boolean(reportSourceReference.trim())) ||
+      reportStep === 6;
+
     return (
       <div className="max-w-xl mx-auto space-y-6 animate-in fade-in duration-200">
         <div>
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-            Step {reportStep} of 6
-          </span>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
-            {t("reportDamageTitle")}
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Step {reportStep} of 6
+            </span>
+
+            <div className="flex flex-wrap gap-2">
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                {language === "en" ? "Unverified" : "Unverified"}
+              </span>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                {language === "en" ? "Field Report" : "Field Report"}
+              </span>
+            </div>
+          </div>
+
+          <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
+            {language === "en" ? "Damage & Needs Report" : "Ulat ng Pinsala at Pangangailangan"}
           </h1>
+
+          <p className="mt-1 text-xs leading-relaxed text-slate-500">
+            {language === "en"
+              ? "Reported information remains unverified until reviewed by an authorized LGU user."
+              : "Mananatiling unverified ang iniulat na impormasyon hanggang masuri ng awtorisadong LGU user."}
+          </p>
+
+          <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+            {language === "en"
+              ? "This reporting form does not replace emergency dispatch. Immediate life-safety emergencies should still use authorized emergency channels."
+              : "Hindi kapalit ng emergency dispatch ang reporting form na ito. Para sa agarang life-safety emergency, gamitin pa rin ang awtorisadong emergency channels."}
+          </p>
         </div>
 
         {/* STEP 1: Which Barangay? */}
@@ -917,52 +968,126 @@ export const ModulePlaceholder: React.FC = () => {
           </div>
         )}
 
-        {/* STEP 2: What Happened? */}
+        {/* STEP 2: Incident and reported population impact */}
         {reportStep === 2 && (
-          <div className="space-y-4">
-            <h2 className="text-base font-bold text-slate-900">
-              {language === "en" ? "2. What incident occurred?" : "2. Anong uri ng insidente ang naganap?"}
-            </h2>
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                {language === "en"
+                  ? "2. What incident occurred?"
+                  : "2. Anong uri ng insidente ang naganap?"}
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                {language === "en"
+                  ? "Choose the closest reported incident category. Counts below are reported figures only, not validated figures."
+                  : "Piliin ang pinakamalapit na reported incident category. Reported figures lamang ang mga bilang sa ibaba at hindi pa validated."}
+              </p>
+            </div>
+
             <div className="space-y-2">
               {incidentTypes.map((type) => (
                 <button
                   key={type}
                   type="button"
                   onClick={() => setSelectedIncident(type)}
-                  className={`w-full p-4 rounded-xl border text-xs font-bold text-left transition-all min-h-[48px] ${
+                  className={`min-h-[48px] w-full rounded-xl border p-4 text-left text-xs font-bold transition-all ${
                     selectedIncident === type
-                      ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                      : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
+                      ? "border-blue-600 bg-blue-600 text-white shadow-xs"
+                      : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
                   }`}
                 >
                   {type}
                 </button>
               ))}
             </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-bold text-slate-800">
+                  {language === "en"
+                    ? "Reported affected persons"
+                    : "Reported affected persons"}
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  value={reportedAffectedPersons}
+                  onChange={(event) => setReportedAffectedPersons(event.target.value)}
+                  placeholder={language === "en" ? "Unknown / leave blank" : "Unknown / iwanang blangko"}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-600/20"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-bold text-slate-800">
+                  {language === "en"
+                    ? "Reported affected households"
+                    : "Reported affected households"}
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  inputMode="numeric"
+                  value={reportedAffectedHouseholds}
+                  onChange={(event) => setReportedAffectedHouseholds(event.target.value)}
+                  placeholder={language === "en" ? "Unknown / leave blank" : "Unknown / iwanang blangko"}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-600/20"
+                />
+              </label>
+            </div>
+
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-slate-800">
+                {language === "en"
+                  ? "Reported vulnerable groups"
+                  : "Reported vulnerable groups"}
+              </span>
+              <textarea
+                value={reportedVulnerableGroups}
+                onChange={(event) => setReportedVulnerableGroups(event.target.value)}
+                placeholder={
+                  language === "en"
+                    ? "e.g. older persons, PWD/mobility limitations, children, medicine-dependent residents. Enter only what was actually reported."
+                    : "hal. older persons, PWD/mobility limitations, mga bata, medicine-dependent residents. Ilagay lamang ang aktuwal na iniulat."
+                }
+                className="min-h-[88px] w-full resize-y rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-600/20"
+              />
+            </label>
           </div>
         )}
 
-        {/* STEP 3: How Serious Is It? */}
+        {/* STEP 3: Reported severity and damage */}
         {reportStep === 3 && (
-          <div className="space-y-4">
-            <h2 className="text-base font-bold text-slate-900">
-              {language === "en" ? "3. How serious is the situation?" : "3. Gaano kalubha ang kalagayan?"}
-            </h2>
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                {language === "en"
+                  ? "3. What severity and damage were reported?"
+                  : "3. Anong severity at pinsala ang naiulat?"}
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                {language === "en"
+                  ? "Severity is a field report classification and still requires authorized review."
+                  : "Field report classification lamang ang severity at kailangan pa rin ng awtorisadong review."}
+              </p>
+            </div>
+
             <div className="space-y-2.5">
               {severityLevels.map((lvl) => (
                 <button
                   key={lvl.id}
                   type="button"
                   onClick={() => setSelectedSeverity(lvl.id)}
-                  className={`w-full p-4 rounded-xl border text-left transition-all ${
+                  className={`w-full rounded-xl border p-4 text-left transition-all ${
                     selectedSeverity === lvl.id
-                      ? "bg-blue-600 text-white border-blue-600 shadow-xs"
-                      : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
+                      ? "border-blue-600 bg-blue-600 text-white shadow-xs"
+                      : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
                   }`}
                 >
-                  <span className="text-xs font-bold block">{lvl.label}</span>
+                  <span className="block text-xs font-bold">{lvl.label}</span>
                   <span
-                    className={`text-[11px] block mt-0.5 ${
+                    className={`mt-0.5 block text-[11px] ${
                       selectedSeverity === lvl.id ? "text-blue-100" : "text-slate-500"
                     }`}
                   >
@@ -971,95 +1096,255 @@ export const ModulePlaceholder: React.FC = () => {
                 </button>
               ))}
             </div>
+
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-slate-800">
+                {language === "en" ? "Reported damage summary" : "Buod ng reported damage"}
+              </span>
+              <textarea
+                value={damageSummary}
+                onChange={(event) => setDamageSummary(event.target.value)}
+                placeholder={
+                  language === "en"
+                    ? "Describe only observed or reported damage. Do not infer unreported damage."
+                    : "Ilarawan lamang ang observed o reported damage. Huwag magdagdag ng hindi naiulat na pinsala."
+                }
+                className="min-h-[110px] w-full resize-y rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-600/20"
+              />
+            </label>
           </div>
         )}
 
-        {/* STEP 4: What Is Needed? */}
+        {/* STEP 4: Conditions, access, and urgent needs */}
         {reportStep === 4 && (
-          <div className="space-y-4">
+          <div className="space-y-5">
             <h2 className="text-base font-bold text-slate-900">
-              {language === "en" ? "4. What urgent assistance is needed?" : "4. Anong agarang tulong ang kailangan?"}
+              {language === "en"
+                ? "4. What conditions and urgent needs were reported?"
+                : "4. Anong conditions at agarang pangangailangan ang naiulat?"}
             </h2>
-            <p className="text-xs text-slate-500">
-              {language === "en" ? "Select all that apply:" : "Piliin ang lahat ng kailangan:"}
-            </p>
-            <div className="grid grid-cols-2 gap-2.5">
-              {needsOptions.map((need) => {
-                const isChecked = selectedNeeds.includes(need);
-                return (
-                  <button
-                    key={need}
-                    type="button"
-                    onClick={() => {
-                      if (isChecked) {
-                        setSelectedNeeds(selectedNeeds.filter((n) => n !== need));
-                      } else {
-                        setSelectedNeeds([...selectedNeeds, need]);
-                      }
-                    }}
-                    className={`p-3.5 rounded-xl border text-xs font-bold text-left transition-all min-h-[48px] flex items-center justify-between ${
-                      isChecked
-                        ? "bg-blue-50 text-blue-900 border-blue-400"
-                        : "bg-white text-slate-800 border-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    <span>{need}</span>
-                    {isChecked && <Check className="w-4 h-4 text-blue-600 shrink-0" />}
-                  </button>
-                );
-              })}
+
+            <div className="grid grid-cols-1 gap-3">
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-bold text-slate-800">
+                  {language === "en"
+                    ? "Critical-facility condition"
+                    : "Kalagayan ng critical facility"}
+                </span>
+                <textarea
+                  value={criticalFacilityCondition}
+                  onChange={(event) => setCriticalFacilityCondition(event.target.value)}
+                  placeholder={
+                    language === "en"
+                      ? "Optional: facility name/role and reported condition."
+                      : "Opsyonal: facility name/role at reported condition."
+                  }
+                  className="min-h-[76px] w-full resize-y rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-600/20"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-bold text-slate-800">
+                  {language === "en" ? "Service disruption" : "Service disruption"}
+                </span>
+                <textarea
+                  value={serviceDisruption}
+                  onChange={(event) => setServiceDisruption(event.target.value)}
+                  placeholder={
+                    language === "en"
+                      ? "Optional: water, power, communications, health, or other reported disruption."
+                      : "Opsyonal: water, power, communications, health, o iba pang reported disruption."
+                  }
+                  className="min-h-[76px] w-full resize-y rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-600/20"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1.5 block text-xs font-bold text-slate-800">
+                  {language === "en"
+                    ? "Accessibility constraints"
+                    : "Accessibility constraints"}
+                </span>
+                <textarea
+                  value={accessibilityConstraints}
+                  onChange={(event) => setAccessibilityConstraints(event.target.value)}
+                  placeholder={
+                    language === "en"
+                      ? "Optional: blocked road, bridge condition, debris, flood depth report, or other access constraint."
+                      : "Opsyonal: blocked road, bridge condition, debris, flood depth report, o ibang access constraint."
+                  }
+                  className="min-h-[76px] w-full resize-y rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-600/20"
+                />
+              </label>
+            </div>
+
+            <div>
+              <p className="mb-2 text-xs font-bold text-slate-800">
+                {language === "en"
+                  ? "Urgent unmet needs (select only what was reported)"
+                  : "Agarang unmet needs (piliin lamang ang naiulat)"}
+              </p>
+              <div className="grid grid-cols-2 gap-2.5">
+                {needsOptions.map((need) => {
+                  const isChecked = selectedNeeds.includes(need);
+                  return (
+                    <button
+                      key={need}
+                      type="button"
+                      onClick={() => {
+                        if (isChecked) {
+                          setSelectedNeeds(selectedNeeds.filter((n) => n !== need));
+                        } else {
+                          setSelectedNeeds([...selectedNeeds, need]);
+                        }
+                      }}
+                      className={`flex min-h-[48px] items-center justify-between rounded-xl border p-3.5 text-left text-xs font-bold transition-all ${
+                        isChecked
+                          ? "border-blue-400 bg-blue-50 text-blue-900"
+                          : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span>{need}</span>
+                      {isChecked && <Check className="h-4 w-4 shrink-0 text-blue-600" />}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
         )}
 
-        {/* STEP 5: Add Photo (Optional) */}
+        {/* STEP 5: Evidence and source */}
         {reportStep === 5 && (
-          <div className="space-y-4">
-            <h2 className="text-base font-bold text-slate-900">
-              {language === "en" ? "5. Add photo or notes (Optional)" : "5. Magdagdag ng larawan o paalala (Opsyonal)"}
-            </h2>
-            <div className="p-6 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 text-center space-y-2">
-              <p className="text-xs font-semibold text-slate-700">
-                {language === "en" ? "Tap to upload or take a photo" : "Pindutin para kumuha ng larawan"}
-              </p>
-              <p className="text-[11px] text-slate-400">
-                {language === "en" ? "Photos help responders verify water depth and debris." : "Tumutulong ang litrato upang makita ang taas ng baha."}
+          <div className="space-y-5">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                {language === "en"
+                  ? "5. What is the report source or evidence?"
+                  : "5. Ano ang source o ebidensya ng report?"}
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                {language === "en"
+                  ? "Use a role, team, bulletin/reference, or other non-sensitive source description when possible."
+                  : "Gumamit ng role, team, bulletin/reference, o ibang non-sensitive source description kung maaari."}
               </p>
             </div>
-            <textarea
-              value={photoNote}
-              onChange={(e) => setPhotoNote(e.target.value)}
-              placeholder={language === "en" ? "Add specific landmark or notes (optional)..." : "Karagdagang detalye o palatandaan (opsyonal)..."}
-              className="w-full p-3 text-xs rounded-xl border border-slate-200 bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-600 min-h-[80px]"
-            />
+
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-slate-800">
+                {language === "en" ? "Source / reporter reference" : "Source / reporter reference"}
+              </span>
+              <input
+                value={reportSourceReference}
+                onChange={(event) => setReportSourceReference(event.target.value)}
+                placeholder={
+                  language === "en"
+                    ? "e.g. CDRRMO field team, barangay official, bulletin/ref no."
+                    : "hal. CDRRMO field team, barangay official, bulletin/ref no."
+                }
+                className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-600/20"
+              />
+            </label>
+
+            <label className="block rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 p-5 text-center">
+              <span className="block text-xs font-semibold text-slate-700">
+                {language === "en"
+                  ? "Attach photo evidence (optional)"
+                  : "Mag-attach ng photo evidence (opsyonal)"}
+              </span>
+              <span className="mt-1 block text-[11px] leading-relaxed text-slate-400">
+                {language === "en"
+                  ? "A selected photo is still unverified and will not persist after reload until backend/offline storage is connected."
+                  : "Unverified pa rin ang napiling photo at hindi ito magpe-persist pagkatapos ng reload hangga't hindi nakakonekta ang backend/offline storage."}
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(event) =>
+                  setEvidenceFileName(event.target.files?.[0]?.name ?? null)
+                }
+                className="mt-3 block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-bold file:text-blue-700"
+              />
+              {evidenceFileName ? (
+                <span className="mt-2 block break-all text-[11px] font-semibold text-slate-600">
+                  {evidenceFileName}
+                </span>
+              ) : null}
+            </label>
+
+            <label className="block">
+              <span className="mb-1.5 block text-xs font-bold text-slate-800">
+                {language === "en" ? "Evidence notes" : "Evidence notes"}
+              </span>
+              <textarea
+                value={photoNote}
+                onChange={(event) => setPhotoNote(event.target.value)}
+                placeholder={
+                  language === "en"
+                    ? "Optional landmark, observation, timestamp context, or evidence note..."
+                    : "Opsyonal na landmark, observation, timestamp context, o evidence note..."
+                }
+                className="min-h-[92px] w-full resize-y rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-600/20"
+              />
+            </label>
           </div>
         )}
 
-        {/* STEP 6: Review & Submit */}
+        {/* STEP 6: Review and save */}
         {reportStep === 6 && (
           <div className="space-y-4">
             <h2 className="text-base font-bold text-slate-900">
-              {language === "en" ? "6. Review and Submit" : "6. Suriin at Ipasa"}
+              {language === "en" ? "6. Review and Save" : "6. Suriin at I-save"}
             </h2>
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5 space-y-3 text-xs">
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-400">Barangay:</span>
-                <span className="font-bold text-slate-900">{selectedReportBarangay}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-400">Incident:</span>
-                <span className="font-bold text-slate-900">{selectedIncident}</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-100 pb-2">
-                <span className="text-slate-400">Severity:</span>
-                <span className="font-bold text-red-700">{selectedSeverity}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">Urgent Needs:</span>
-                <span className="font-bold text-slate-900 text-right">
-                  {selectedNeeds.join(", ") || "None specified"}
+
+            <div className="space-y-2 rounded-2xl border border-slate-200 bg-white p-4 text-xs sm:p-5">
+              {[
+                ["Barangay", selectedReportBarangay || "—"],
+                ["Incident", selectedIncident || "—"],
+                ["Reported severity", selectedSeverity || "—"],
+                ["Reported affected persons", reportedAffectedPersons || "Unknown"],
+                ["Reported affected households", reportedAffectedHouseholds || "Unknown"],
+                ["Reported vulnerable groups", reportedVulnerableGroups || "None specified"],
+                ["Damage summary", damageSummary || "—"],
+                ["Critical-facility condition", criticalFacilityCondition || "None specified"],
+                ["Service disruption", serviceDisruption || "None specified"],
+                ["Accessibility constraints", accessibilityConstraints || "None specified"],
+                ["Urgent unmet needs", selectedNeeds.join(", ") || "None specified"],
+                ["Source / reporter reference", reportSourceReference || "—"],
+                ["Evidence attachment", evidenceFileName || "None"],
+                ["Evidence notes", photoNote || "None specified"],
+              ].map(([label, value]) => (
+                <div
+                  key={label}
+                  className="flex flex-col gap-1 border-b border-slate-100 pb-2 last:border-b-0 last:pb-0 sm:flex-row sm:justify-between"
+                >
+                  <span className="text-slate-400">{label}:</span>
+                  <span className="max-w-sm text-left font-bold text-slate-900 sm:text-right">
+                    {value}
+                  </span>
+                </div>
+              ))}
+
+              <div className="flex justify-between border-t border-slate-100 pt-2">
+                <span className="text-slate-400">
+                  {language === "en" ? "Verification:" : "Verification:"}
                 </span>
+                <span className="font-bold text-amber-700">Unverified</span>
               </div>
+
+              <div className="flex justify-between">
+                <span className="text-slate-400">
+                  {language === "en" ? "After local save:" : "Pagkatapos ng local save:"}
+                </span>
+                <span className="font-bold text-blue-700">Pending Sync</span>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3.5 text-xs leading-relaxed text-blue-900">
+              {language === "en"
+                ? "Saving creates only a client-side Pending Sync state in this frontend prototype. Reported values remain distinct from validated values until the synchronization and authorized LGU review backend is connected."
+                : "Client-side Pending Sync state lamang ang ginagawa ng save sa frontend prototype na ito. Mananatiling hiwalay ang reported values sa validated values hangga't hindi nakakonekta ang synchronization at authorized LGU review backend."}
             </div>
           </div>
         )}
@@ -1082,17 +1367,27 @@ export const ModulePlaceholder: React.FC = () => {
             <button
               type="button"
               onClick={() => setReportStep(reportStep + 1)}
-              className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold transition-colors shadow-xs"
+              disabled={!canAdvanceReport}
+              className="rounded-xl bg-blue-600 px-6 py-2.5 text-xs font-bold text-white shadow-xs transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-45"
             >
               {t("next")}
             </button>
           ) : (
             <button
               type="button"
-              onClick={() => setIsReportSubmitted(true)}
-              className="px-6 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-colors shadow-xs"
+              onClick={() => {
+                const generatedId =
+                  typeof crypto !== "undefined" && "randomUUID" in crypto
+                    ? `AGAP-${crypto.randomUUID()}`
+                    : `AGAP-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+                setPendingReportId(generatedId);
+                setPendingReportTimestamp(new Date().toLocaleString());
+                setIsReportSubmitted(true);
+              }}
+              className="rounded-xl bg-slate-900 px-6 py-2.5 text-xs font-bold text-white shadow-xs transition-colors hover:bg-slate-800"
             >
-              {t("submitReport")}
+              {language === "en" ? "Save as Pending Sync" : "I-save bilang Pending Sync"}
             </button>
           )}
         </div>
@@ -1101,114 +1396,83 @@ export const ModulePlaceholder: React.FC = () => {
   };
 
   // =========================================================================
-  // VIEW 7: RECOVERY SCREEN
+  // VIEW 7: POST IMPACT ACTION CARD
   // =========================================================================
-  const renderRecoveryScreen = () => {
+  const renderPostImpactScreen = () => {
+    const barangayNames = [...TOP_BARANGAYS, ...OTHER_BARANGAYS].map(
+      (barangay) => barangay.name
+    );
+
     return (
       <div className="space-y-6 animate-in fade-in duration-200">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-            {t("recoveryTitle")}
+        <header>
+          <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-700">
+            {language === "en"
+              ? "Post-Disaster Review"
+              : "Post-Disaster Review"}
+          </span>
+
+          <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+            {language === "en"
+              ? "Post Impact Action Card"
+              : "Post Impact Action Card"}
           </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            {t("recoverySubtitle")}
+
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
+            {language === "en"
+              ? "Review reported and validated impacts, remaining validation gaps, and source-anchored LGU actions. AGAP does not use a 0–100 recovery score."
+              : "Suriin ang reported at validated impacts, natitirang validation gaps, at source-anchored LGU actions. Hindi gumagamit ang AGAP ng 0–100 recovery score."}
           </p>
-        </div>
+        </header>
 
-        {/* Clean Top Priorities List */}
-        <div className="divide-y divide-slate-100 bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          {RECOVERY_PRIORITIES.map((item) => {
-            const isDetailOpen = selectedRecoveryDetail === item.rank;
-            const reason = language === "en" ? item.mainReasonEn : item.mainReasonFil;
+        <section className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5">
+          <label className="block max-w-sm">
+            <span className="text-xs font-bold text-slate-700">
+              {language === "en"
+                ? "Barangay for post-impact review"
+                : "Barangay para sa post-impact review"}
+            </span>
 
-            return (
-              <div key={item.rank} className="p-5 space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono font-bold text-sm text-slate-400">
-                      {item.rank} —
-                    </span>
-                    <h2 className="text-base font-bold text-slate-900">
-                      {item.barangayName}
-                    </h2>
-                  </div>
-                  {renderPriorityBadge(item.priorityLevel, item.priorityLevelFil)}
-                </div>
+            <select
+              value={selectedPostImpactBarangay}
+              onChange={(event) =>
+                setSelectedPostImpactBarangay(event.target.value)
+              }
+              className="mt-2 min-h-[44px] w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm text-slate-800 outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+            >
+              {barangayNames.map((barangay) => (
+                <option key={barangay} value={barangay}>
+                  {barangay}
+                </option>
+              ))}
+            </select>
+          </label>
 
-                <div className="text-xs text-slate-600 pl-6">
-                  <span className="text-slate-400 font-medium block">
-                    {t("mainReason")}
-                  </span>
-                  <p className="mt-0.5 text-slate-800 font-medium">{reason}</p>
-                </div>
+          <p className="mt-3 text-[11px] leading-relaxed text-slate-500">
+            {language === "en"
+              ? "Observed impacts and approved actions will populate this card after the backend consolidates damage reports, needs reports, verification records, and action-rule matches."
+              : "Lalabas sa card ang observed impacts at approved actions kapag na-consolidate na ng backend ang damage reports, needs reports, verification records, at action-rule matches."}
+          </p>
+        </section>
 
-                <div className="pl-6 pt-1">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setSelectedRecoveryDetail(isDetailOpen ? null : item.rank)
-                    }
-                    className="text-xs font-bold text-blue-700 hover:underline inline-flex items-center gap-1"
-                  >
-                    <span>{isDetailOpen ? "Hide Details" : t("viewDetails")}</span>
-                    {isDetailOpen ? (
-                      <ChevronUp className="w-3.5 h-3.5" />
-                    ) : (
-                      <ChevronDown className="w-3.5 h-3.5" />
-                    )}
-                  </button>
+        <PostImpactActionCard
+          barangayName={selectedPostImpactBarangay}
+          eventName={null}
+          observedImpacts={null}
+          preEventComparison={null}
+          dataGaps={[]}
+          actions={[]}
+        />
 
-                  {isDetailOpen && (
-                    <div className="mt-3 p-3.5 bg-slate-50 rounded-xl text-xs space-y-1.5 border border-slate-100">
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Water Allocation:</span>
-                        <span className="font-bold text-slate-900">{item.waterNeeded}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Relief Packs:</span>
-                        <span className="font-bold text-slate-900">{item.foodPacks}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Medical Team:</span>
-                        <span className="font-bold text-slate-900">{item.medicalTeam}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Clearing Status:</span>
-                        <span className="font-bold text-slate-900">{item.clearingRequired}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Collapsible: How was this calculated? */}
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={() => setShowRecoveryFormula(!showRecoveryFormula)}
-            className="text-xs font-bold text-slate-500 hover:text-slate-800 underline flex items-center gap-1"
-          >
-            <span>{t("howCalculated")}</span>
-            {showRecoveryFormula ? (
-              <ChevronUp className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            )}
-          </button>
-
-          {showRecoveryFormula && (
-            <div className="mt-3 p-4 bg-white rounded-xl border border-slate-200 text-xs text-slate-600 space-y-1.5 animate-in fade-in duration-150">
-              <p className="font-bold text-slate-800">
-                Recovery Ranking Formula:
-              </p>
-              <p>
-                Calculated by weighting verified field damage reports (40%) + density of affected displaced families (35%) + critical lifeline interruption (water/health, 25%).
-              </p>
-            </div>
-          )}
+        <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs leading-relaxed text-blue-900">
+          <strong>
+            {language === "en"
+              ? "Integration boundary:"
+              : "Integration boundary:"}
+          </strong>{" "}
+          {language === "en"
+            ? "The frontend does not calculate recovery priority, validate affected-population figures, allocate relief, or invent post-impact actions. Those records and source-anchored recommendations must come from the backend and authorized LGU review workflow."
+            : "Hindi kinakalkula ng frontend ang recovery priority, hindi nito bina-validate ang affected-population figures, hindi ito naglalaan ng relief, at hindi ito gumagawa ng post-impact actions. Dapat manggaling ang mga record at source-anchored recommendations sa backend at awtorisadong LGU review workflow."}
         </div>
       </div>
     );
@@ -1244,7 +1508,7 @@ export const ModulePlaceholder: React.FC = () => {
   }
 
   if (currentModule === "recovery") {
-    return renderRecoveryScreen();
+    return renderPostImpactScreen();
   }
 
   return renderHomeScreen();

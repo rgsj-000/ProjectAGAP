@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
-import { MOCK_USER } from "@/lib/mock-data"
+import { MOCK_USER } from "@/lib/mock-data";
 import { User, ShieldCheck, ChevronDown, Check, Building } from "lucide-react";
 
 interface UserProfileAreaProps {
@@ -11,28 +11,28 @@ interface UserProfileAreaProps {
 
 const AVAILABLE_ROLES = [
   {
-    name: "Engr. Maria Santos",
-    roleEn: "CDRRMO Operations Officer",
-    roleFil: "Opisyal ng Operasyon ng CDRRMO",
-    assigned: "City EOC (Lucena City)",
-    badgeEn: "LGU Admin",
-    badgeFil: "LGU Tagapangasiwa",
+    name: MOCK_USER.name,
+    roleEn: MOCK_USER.roleEn,
+    roleFil: MOCK_USER.roleFil,
+    assigned: MOCK_USER.assignedLgu,
+    badgeEn: "Demo LGU View",
+    badgeFil: "Demo LGU View",
   },
   {
-    name: "Hon. Roberto Ilagan",
-    roleEn: "Barangay Captain",
-    roleFil: "Punong Barangay",
-    assigned: "Barangay Cotta, Lucena City",
-    badgeEn: "Barangay Official",
-    badgeFil: "Opisyal ng Barangay",
+    name: "Demo Barangay User",
+    roleEn: "Barangay Official Placeholder",
+    roleFil: "Placeholder ng Barangay Official",
+    assigned: "Lucena City — Demo Barangay Context",
+    badgeEn: "Demo Barangay View",
+    badgeFil: "Demo Barangay View",
   },
   {
-    name: "Capt. Danilo Alcala",
-    roleEn: "Disaster Response Lead",
-    roleFil: "Lider ng Disaster Response",
-    assigned: "Barangay Dalahican Coastal Unit",
-    badgeEn: "Field Responder",
-    badgeFil: "Responder sa Komunidad",
+    name: "Demo Field Responder",
+    roleEn: "Field Responder Placeholder",
+    roleFil: "Placeholder ng Field Responder",
+    assigned: "Lucena City — Demo Field Context",
+    badgeEn: "Demo Field View",
+    badgeFil: "Demo Field View",
   },
 ];
 
@@ -79,8 +79,8 @@ export const UserProfileArea: React.FC<UserProfileAreaProps> = ({ compact = fals
                     .slice(0, 2)}
                 </div>
                 <span
-                  className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-green-500 ring-2 ring-white"
-                  title="Active / On Duty"
+                  className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-slate-400 ring-2 ring-white"
+                  title={language === "en" ? "Demo role selected" : "Napiling demo role"}
                 />
               </div>
 
@@ -124,12 +124,12 @@ export const UserProfileArea: React.FC<UserProfileAreaProps> = ({ compact = fals
           <div className="absolute bottom-full left-0 mb-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 z-50 p-2 animate-in fade-in zoom-in-95 duration-150">
             <div className="px-3 py-2 border-b border-slate-100">
               <p className="text-xs font-bold text-slate-900">
-                {language === "en" ? "Simulate User Role" : "Subukan ang Tungkulin"}
+                {language === "en" ? "Demo User Role" : "Demo User Role"}
               </p>
               <p className="text-[11px] text-slate-500">
                 {language === "en"
-                  ? "Test Project AGAP through different user views"
-                  : "Subukan ang AGAP sa iba't ibang antas ng opisyal"}
+                  ? "Preview frontend layouts using synthetic roles only"
+                  : "I-preview ang frontend layouts gamit lamang ang synthetic demo roles"}
               </p>
             </div>
 
