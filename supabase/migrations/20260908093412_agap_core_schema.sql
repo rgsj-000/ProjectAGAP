@@ -1,0 +1,17 @@
+data_sources
+barangays
+profiles
+population_profiles
+critical_facilities
+hazard_exposures
+preparedness_gaps
+advisories
+advisory_barangays
+household_profiles
+damage_reports
+needs_reports
+scoring_rules
+preparedness_factor_inputs
+priority_scores
+generated_outputs
+audit_logs
