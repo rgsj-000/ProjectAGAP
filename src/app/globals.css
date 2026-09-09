@@ -49,6 +49,8 @@
   body.printing-agap-pack .agap-print-pack,
   body.printing-agap-pack .agap-print-pack * { visibility: visible; }
   body.printing-agap-pack .agap-print-pack { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; background: white; }
+  body.printing-agap-pack .agap-pack-page { break-after: page; min-height: 240mm; }
+  body.printing-agap-pack .agap-pack-page:last-child { break-after: auto; }
   .agap-print-pack h3 { break-after: avoid; }
   .agap-print-pack tr { break-inside: avoid; }
 }

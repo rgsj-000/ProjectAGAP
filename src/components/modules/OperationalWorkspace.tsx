@@ -26,7 +26,6 @@ import { ConnectedHouseholdCard } from "@/components/household/ConnectedHousehol
 import { ConnectivityStatus } from "@/components/feedback/ConnectivityStatus";
 import { calculateRisk } from "@/lib/domain/riskEngine";
 import { assertCurrentAdvisory } from "@/lib/domain/advisory";
-import { ReferenceDataForms } from "./ReferenceDataForms";
 import { OfflineOperationsPack } from "./OfflineOperationsPack";
 
 type Row = Record<string, any>;
@@ -109,7 +108,12 @@ const str = (v: unknown) =>
       : String(v);
 
 export function OperationalWorkspace() {
-  const { currentModule, prepareSubView, setCurrentModule } = useNavigation();
+  const {
+    currentModule,
+    prepareSubView,
+    setCurrentModule,
+    isFieldResponderUser,
+  } = useNavigation();
   const [data, setData] = useState<Workspace | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -405,8 +409,17 @@ export function OperationalWorkspace() {
         </p>
       )}
       {contextSelector}
-      {view === "home" && reviewer && !offline && (
-        <ReferenceDataForms barangayId={barangayId} onSaved={load} />
+      {view === "home" && isFieldResponderUser && (
+        <Section title="Primary field task">
+          <p className="text-sm text-slate-600">
+            Record observed damage, affected people, service disruptions, access
+            conditions, priority needs, and supporting evidence. Reports remain
+            unverified until authorized LGU review.
+          </p>
+          <Button onClick={() => setCurrentModule("report-damage")}>
+            Open damage & needs report
+          </Button>
+        </Section>
       )}
       {advisory?.is_demo && (
         <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
@@ -442,7 +455,9 @@ export function OperationalWorkspace() {
             )}
             <div className="flex flex-wrap gap-3">
               <Button
-                disabled={busy || offline || data.role === "field_reporter"}
+                disabled={
+                  busy || offline || data.role === "field_reporter" || isFieldResponderUser
+                }
                 onClick={() => setShowAdvisory(!showAdvisory)}
               >
                 Enter advisory
@@ -496,30 +511,6 @@ export function OperationalWorkspace() {
               />
             )}
           </Section>
-          <Section title="Current data">
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                ["Barangays", data.barangays.length],
-                ["Risk assessments", data.risk_assessments.length],
-                [
-                  "Exposure estimates",
-                  data.population_exposure_estimates.length,
-                ],
-                ["Critical facilities", data.critical_facilities.length],
-              ].map(([label, n]) => (
-                <div key={label} className="rounded-xl bg-slate-50 p-4">
-                  <p className="text-2xl font-bold">{n}</p>
-                  <p className="text-sm text-slate-600">{label}</p>
-                </div>
-              ))}
-            </div>
-            <Button
-              disabled={busy || offline}
-              onClick={() => void run(load, "Data refreshed and cached.")}
-            >
-              Refresh data
-            </Button>
-          </Section>
         </>
       )}
       {view === "prepare" && (
@@ -547,12 +538,6 @@ export function OperationalWorkspace() {
                   className="space-y-4"
                   onSubmit={(e) =>
                     submit(e, async (f) => {
-                      if (
-                        Boolean(f.get("threat")) !== Boolean(f.get("adaptive"))
-                      )
-                        throw new Error(
-                          "Provide both threat and adaptive capacity, or leave both blank.",
-                        );
                       const input = {
                         barangayId,
                         advisoryId,
@@ -566,12 +551,6 @@ export function OperationalWorkspace() {
                           .split("\n")
                           .filter(Boolean),
                         confidenceLevel: f.get("confidence"),
-                        ...(f.get("threat") && f.get("adaptive")
-                          ? {
-                              threatLevel: Number(f.get("threat")),
-                              adaptiveCapacity: Number(f.get("adaptive")),
-                            }
-                          : {}),
                       };
                       if (offline) {
                         assertCurrentAdvisory(
@@ -634,22 +613,6 @@ export function OperationalWorkspace() {
                       name="severity"
                       type="number"
                       min={1}
-                    />
-                    <Field
-                      label="Threat level (optional pair)"
-                      name="threat"
-                      type="number"
-                      required={false}
-                      min={0}
-                      step="any"
-                    />
-                    <Field
-                      label="Adaptive capacity (optional pair)"
-                      name="adaptive"
-                      type="number"
-                      required={false}
-                      min={0}
-                      step="any"
                     />
                   </div>
                   <Field
@@ -1294,25 +1257,178 @@ function ConnectedPostOutput({ value }: { value: Row }) {
 }
 function PreparednessBrief({ card: c }: { card: Row }) {
   const a = c.situation.currentVerifiedAdvisory;
+  const [aiBrief, setAiBrief] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const w = c.whyAttentionIsNeeded;
+  const e = c.potentialExposure;
+  const p = c.preparednessCapacity;
+  const formatDate = (value: unknown) => {
+    if (!value) return "Not recorded";
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime())
+      ? String(value)
+      : new Intl.DateTimeFormat("en-PH", {
+          dateStyle: "long",
+          timeStyle: "short",
+        }).format(date);
+  };
+  const display = (value: unknown, fallback = "Not recorded") =>
+    value === null || value === undefined || value === "" ? fallback : String(value);
+  const facilities = Array.isArray(p.criticalFacilities) ? p.criticalFacilities : [];
+  const gaps = [
+    "Shelter occupancy: Not yet validated",
+    "Critical facility status: Requires confirmation",
+    "Current road/access condition: Requires confirmation",
+    "Barangay communication status: Requires confirmation",
+  ];
+  const generateAiBrief = async () => {
+    if (!c.outputId) {
+      setAiError("This output has no persisted source record for AI briefing.");
+      return;
+    }
+    setAiBusy(true);
+    setAiError("");
+    try {
+      const response = await fetch("/api/ai", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ outputId: c.outputId, mode: "brief", language: "en" }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error?.message ?? "AI briefing unavailable.");
+      setAiBrief(result.data?.text ?? result.data?.content?.content ?? "");
+      if (result.data?.fallback) setAiError("AI wording is unavailable. The structured brief below remains based on verified data.");
+    } catch (error) {
+      setAiError(error instanceof Error ? error.message : "AI briefing unavailable.");
+    } finally {
+      setAiBusy(false);
+    }
+  };
   return (
-    <Section title="Barangay preparedness brief & offline pack">
-      <p className="text-sm">
-        {c.situation.barangay} · {a.bulletinReference} · Source {a.sourceAgency}{" "}
-        · Valid until {a.validityEnd}
-      </p>
-      <p className="whitespace-pre-wrap text-sm">{a.warningInformation}</p>
-      <ul className="list-disc space-y-2 pl-5 text-sm">
-        {c.recommendedActions.map((r: Row) => (
-          <li key={r.actionRuleId}>
-            {r.action} — {r.responsibleUnit} · {r.actionRuleId} · {r.source}
-          </li>
-        ))}
-      </ul>
-      <p className="text-sm">
-        Confirm current instructions with authorized LGU officials. Estimates
-        are not validated impact counts.
-      </p>
-      <Button onClick={() => window.print()}>Print cards & brief</Button>
+    <Section title={`${c.situation.barangay} Preparedness Brief`}>
+      <div className="space-y-6 text-sm">
+        <header className="border-b border-slate-200 pb-5">
+          <p className="text-xs font-bold uppercase tracking-widest text-blue-700">
+            {display(c.situation.hazard, "Preparedness assessment")}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <h2 className="text-2xl font-black text-slate-950">
+              {c.situation.barangay}, Lucena City
+            </h2>
+            <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+              {a.isDemo ? "Priority LGU review" : display(c.situation.verificationState)}
+            </span>
+          </div>
+          <p className="mt-2 text-slate-600">
+            Assessment: {a.isDemo ? "Synthetic demonstration scenario" : "Source-anchored assessment"} · Last updated {formatDate(c.situation.assessmentDate)}
+          </p>
+          <p className="mt-1 text-slate-600">
+            Advisory status: {a.isDemo ? "Valid for demonstration only" : display(a.verificationStatus)} · Valid until {formatDate(a.validityEnd)}
+          </p>
+        </header>
+
+        <section>
+          <h3 className="text-base font-bold text-slate-950">Situation</h3>
+          <p className="mt-2 whitespace-pre-wrap leading-relaxed text-slate-700">
+            {display(a.warningInformation, "No advisory situation summary has been recorded.")}
+          </p>
+          <p className="mt-2 leading-relaxed text-slate-700">
+            AGAP has identified conditions requiring LGU and barangay validation before further preparedness decisions are made.
+          </p>
+        </section>
+
+        <section>
+          <h3 className="text-base font-bold text-slate-950">Why {c.situation.barangay} needs attention</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Risk assessment</p>
+              <p className="mt-2 font-semibold">Risk category: {display(c.situation.riskCategory)}</p>
+              <p className="mt-1 text-slate-600">Likelihood: {display(w.riskInputs?.likelihood)}</p>
+              <p className="text-slate-600">Severity of consequence: {display(w.riskInputs?.severity)}</p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Potential exposure</p>
+              <p className="mt-2 font-semibold">{display(e.estimatedPopulation)} persons / {display(e.estimatedHouseholds)} households</p>
+              <p className="mt-1 text-slate-600">Confidence: {display(e.confidenceLevel)}</p>
+              <p className="text-slate-600">Method: {display(e.estimationMethod)}</p>
+            </div>
+          </div>
+        </section>
+
+        <section>
+          <h3 className="text-base font-bold text-slate-950">Preparedness capacity</h3>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <p className="rounded-xl border border-slate-200 p-4">Recorded shelter capacity: <strong>{display(p.validatedCapacity)}</strong></p>
+            <p className="rounded-xl border border-slate-200 p-4">Potential capacity gap: <strong>{display(p.capacityGap)}</strong></p>
+            <p className="rounded-xl border border-slate-200 p-4">Critical facilities requiring confirmation: <strong>{facilities.length}</strong></p>
+            <p className="rounded-xl border border-slate-200 p-4">Communication capability: <strong>{display(p.communicationAccess, "Unknown")}</strong></p>
+          </div>
+        </section>
+
+        <section>
+          <h3 className="text-base font-bold text-slate-950">Priority checks</h3>
+          <ol className="mt-3 list-decimal space-y-2 pl-5 text-slate-700">
+            <li>Validate current barangay conditions against the assessment.</li>
+            <li>Check evacuation and temporary shelter capacity, access, utilities, and readiness.</li>
+            <li>Check critical facilities, communications, health services, schools, and evacuation facilities.</li>
+            <li>Confirm preparedness of households with older persons, children, persons with disabilities, and medicine needs.</li>
+            <li>Prepare verified public communication using approved preparedness instructions.</li>
+          </ol>
+        </section>
+
+        <section>
+          <h3 className="text-base font-bold text-slate-950">Information still needed</h3>
+          <ul className="mt-3 space-y-2 text-slate-700">
+            {gaps.map((gap) => <li key={gap} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">{gap}</li>)}
+          </ul>
+        </section>
+
+        <section>
+          <h3 className="text-base font-bold text-slate-950">LGU actions</h3>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[
+              "Validate Barangay",
+              "Request Update",
+              "Assign Action",
+              "Generate Preparedness Brief",
+              "Generate Household Card",
+              "Record Decision",
+            ].map((action) => <span key={action} className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 font-semibold text-blue-800">{action}</span>)}
+          </div>
+        </section>
+
+        <section className="border-t border-slate-200 pt-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-bold text-slate-950">AI-generated brief wording</h3>
+              <p className="mt-1 text-xs text-slate-500">Generated only from this persisted action card and its source snapshot. It cannot change assessments or recommendations.</p>
+            </div>
+            <Button onClick={() => void generateAiBrief()} disabled={aiBusy || !c.outputId}>
+              {aiBusy ? "Generating..." : "Generate AI brief"}
+            </Button>
+          </div>
+          {aiError ? <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{aiError}</p> : null}
+          {aiBrief ? <p className="mt-3 whitespace-pre-wrap rounded-xl border border-blue-200 bg-blue-50/50 p-4 leading-relaxed text-slate-800">{aiBrief}</p> : null}
+        </section>
+
+        <p className="border-l-4 border-amber-400 bg-amber-50 p-4 font-semibold leading-relaxed text-amber-950">
+          This is a decision support assessment, not an evacuation order. Confirm current conditions and instructions with authorized Lucena City and barangay disaster officials.
+        </p>
+
+        <details className="border-t border-slate-200 pt-4">
+          <summary className="cursor-pointer font-semibold text-slate-700">View sources & methodology</summary>
+          <div className="mt-3 space-y-2 rounded-xl bg-slate-50 p-4 text-xs text-slate-600">
+            <p>Advisory reference: {display(a.bulletinReference)}</p>
+            <p>Source: {display(a.sourceAgency)} · Issued: {formatDate(a.issueTime)}</p>
+            <p>Methodology: {display(w.methodology)}</p>
+            <p>Source dates: advisory valid until {formatDate(a.validityEnd)} · exposure reference {formatDate(e.referenceDate)}</p>
+            <p>Action rule IDs: {c.recommendedActions.map((r: Row) => r.actionRuleId).join(", ") || "None recorded"}</p>
+            <p>Verification: {display(c.situation.verificationState)}</p>
+            {a.isDemo ? <p>Synthetic demonstration data. Not official disaster information.</p> : null}
+          </div>
+        </details>
+      </div>
     </Section>
   );
 }

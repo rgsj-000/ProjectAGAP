@@ -9,14 +9,12 @@ import { AlertCircle, FileText, Image as ImageIcon, Plus, ShieldCheck, Trash2, U
 export interface AdvisoryFormValues {
   title: string;
   source: string;
-  status: "ACTIVE" | "MONITORING" | "ENDED";
   issuedTime: string;
   bulletinNumber: string;
   validity: string;
   affectedLocations: string;
   warningInformation: string;
   sourceUrl: string;
-  verificationState: "UNVERIFIED" | "FOR_REVIEW" | "VERIFIED";
   message: string;
   precautions: string[];
 }
@@ -31,14 +29,12 @@ interface AdvisoryFormProps {
 const DEFAULT_VALUES: AdvisoryFormValues = {
   title: "",
   source: "PAGASA • DOST",
-  status: "ACTIVE",
   issuedTime: "",
   bulletinNumber: "",
   validity: "",
   affectedLocations: "",
   warningInformation: "",
   sourceUrl: "",
-  verificationState: "UNVERIFIED",
   message: "",
   precautions: [""],
 };
@@ -115,7 +111,6 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             titlePlaceholder: "e.g. Severe Rainfall Advisory",
             sourceLabel: "Issuing source",
             sourcePlaceholder: "e.g. PAGASA • DOST",
-            statusLabel: "Advisory status",
             issuedLabel: "Issued / updated time",
             issuedPlaceholder: "e.g. Updated 11:00 AM Today",
             bulletinLabel: "Bulletin / reference number",
@@ -130,9 +125,6 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
               "Enter the warning level, classification, rainfall range, wind signal, or other source-issued warning information.",
             sourceUrlLabel: "Official source link",
             sourceUrlPlaceholder: "https://...",
-            verificationStateLabel: "Verification status",
-            verificationStateHelp:
-              "Verification status is confirmed through the authorized LGU review process.",
             messageLabel: "Main advisory message",
             messagePlaceholder: "Enter the verified advisory summary...",
             precautionsLabel: "Key directives / precautions",
@@ -171,7 +163,6 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             titlePlaceholder: "hal. Babala sa Malakas na Ulan",
             sourceLabel: "Ahensyang naglabas",
             sourcePlaceholder: "hal. PAGASA • DOST",
-            statusLabel: "Advisory status",
             issuedLabel: "Oras ng paglabas / update",
             issuedPlaceholder: "hal. Na-update 11:00 AM Ngayon",
             bulletinLabel: "Bulletin / reference number",
@@ -186,9 +177,6 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
               "Ilagay ang warning level, classification, rainfall range, wind signal, o iba pang impormasyong inilabas ng source.",
             sourceUrlLabel: "Opisyal na source link",
             sourceUrlPlaceholder: "https://...",
-            verificationStateLabel: "Verification status",
-            verificationStateHelp:
-              "Ang verification status ay kinukumpirma sa authorized LGU review process.",
             messageLabel: "Pangunahing mensahe",
             messagePlaceholder: "Ilagay ang beripikadong buod ng babala...",
             precautionsLabel: "Mga pangunahing tagubilin / pag-iingat",
@@ -548,24 +536,6 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
           </Field>
 
           <Field
-            label={copy.statusLabel}
-            helpContent={getHelpContent("advisoryStatus", language)}
-            helpAlign="right"
-          >
-            <select
-              value={values.status}
-              onChange={(event) =>
-                updateField("status", event.target.value as AdvisoryFormValues["status"])
-              }
-              className={inputClass(false)}
-            >
-              <option value="ACTIVE">ACTIVE</option>
-              <option value="MONITORING">MONITORING</option>
-              <option value="ENDED">ENDED</option>
-            </select>
-          </Field>
-
-          <Field
             label={copy.issuedLabel}
             error={errors.issuedTime}
             helpContent={getHelpContent("advisoryIssuedTime", language)}
@@ -608,27 +578,6 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
               className={inputClass(Boolean(errors.validity))}
               aria-invalid={Boolean(errors.validity)}
             />
-          </Field>
-
-          <Field
-            label={copy.verificationStateLabel}
-            helpContent={getHelpContent("advisoryVerificationStatus", language)}
-            helpAlign="right"
-          >
-            <select
-              value={values.verificationState}
-              onChange={(event) =>
-                updateField(
-                  "verificationState",
-                  event.target.value as AdvisoryFormValues["verificationState"]
-                )
-              }
-              className={inputClass(false)}
-            >
-              <option value="UNVERIFIED">Unverified</option>
-              <option value="FOR_REVIEW">For Review</option>
-              <option value="VERIFIED">Verified</option>
-            </select>
           </Field>
 
           <Field

@@ -24,6 +24,7 @@ interface NavigationContextType {
   userView: DemoUserView;
   setUserView: (view: DemoUserView) => void;
   isBarangayUser: boolean;
+  isFieldResponderUser: boolean;
   isPublicUser: boolean;
   assignedBarangayId: string | null;
   assignedBarangay: BarangayPriority | null;
@@ -63,6 +64,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   const allBarangays = [...TOP_BARANGAYS, ...OTHER_BARANGAYS];
 
   const isBarangayUser = userView === "barangay-gulang-gulang";
+  const isFieldResponderUser = userView === "field-responder";
   const isPublicUser = userView === "public-resident";
   const assignedBarangayId = isBarangayUser ? GULANG_GULANG_BARANGAY_ID : null;
   const assignedBarangay =
@@ -103,6 +105,11 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
       }
     }
 
+    if (view === "field-responder") {
+      setCurrentModuleState("home");
+      setPrepareSubViewState("menu");
+    }
+
     if (view === "public-resident") {
       // The public experience is rendered outside the internal LGU module shell.
       setCurrentModuleState("home");
@@ -119,6 +126,11 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   };
 
   const setPrepareSubView = (view: PrepareSubView) => {
+    if (isFieldResponderUser) {
+      setPrepareSubViewState("menu");
+      return;
+    }
+
     if (
       isBarangayUser &&
       (view === "priority-barangays" || view === "barangay-detail")
@@ -132,6 +144,12 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   };
 
   const setCurrentModule = (id: PrimaryModuleId) => {
+    if (isFieldResponderUser && id !== "home" && id !== "report-damage") {
+      setCurrentModuleState("home");
+      scrollToTop();
+      return;
+    }
+
     // Recovery/Post Impact remains an LGU-level workflow for this barangay demo.
     if (isBarangayUser && id === "recovery") {
       setCurrentModuleState("home");
@@ -158,6 +176,13 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   };
 
   const goToPrepare = (subView: PrepareSubView = "menu") => {
+    if (isFieldResponderUser) {
+      setCurrentModuleState("home");
+      setPrepareSubViewState("menu");
+      scrollToTop();
+      return;
+    }
+
     setCurrentModuleState("prepare");
     setSelectedBarangayIdState(
       isBarangayUser ? GULANG_GULANG_BARANGAY_ID : selectedBarangayId
@@ -176,6 +201,13 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   };
 
   const goToPriorityBarangays = () => {
+    if (isFieldResponderUser) {
+      setCurrentModuleState("home");
+      setPrepareSubViewState("menu");
+      scrollToTop();
+      return;
+    }
+
     setCurrentModuleState("prepare");
 
     if (isBarangayUser) {
@@ -189,6 +221,13 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   };
 
   const goToBarangayDetail = (barangayId: string) => {
+    if (isFieldResponderUser) {
+      setCurrentModuleState("home");
+      setPrepareSubViewState("menu");
+      scrollToTop();
+      return;
+    }
+
     setCurrentModuleState("prepare");
 
     if (isBarangayUser) {
@@ -211,6 +250,12 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   };
 
   const goToRecovery = () => {
+    if (isFieldResponderUser) {
+      setCurrentModuleState("home");
+      scrollToTop();
+      return;
+    }
+
     if (isBarangayUser) {
       setCurrentModuleState("home");
       scrollToTop();
@@ -230,6 +275,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
         userView,
         setUserView,
         isBarangayUser,
+        isFieldResponderUser,
         isPublicUser,
         assignedBarangayId,
         assignedBarangay,
