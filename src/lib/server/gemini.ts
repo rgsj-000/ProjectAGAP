@@ -91,8 +91,24 @@ export async function explainWithGemini(input: {
     }
 
     if (!response.ok) {
+      const providerStatus =
+        typeof body?.error?.status === "string" ? body.error.status : undefined;
+      const providerMessage =
+        typeof body?.error?.message === "string"
+          ? body.error.message.slice(0, 1200)
+          : undefined;
+
+      console.error("AGAP Gemini provider HTTP error", {
+        model,
+        status: response.status,
+        statusText: response.statusText,
+        providerStatus,
+        providerMessage,
+        elapsedMs: Date.now() - startedAt,
+      });
+
       throw new Error(
-        `Gemini HTTP ${response.status}${body?.error?.status ? ` (${body.error.status})` : ""}`,
+        `Gemini HTTP ${response.status}${providerStatus ? ` (${providerStatus})` : ""}`,
       );
     }
     if (bodyParseError) throw bodyParseError;
