@@ -27,10 +27,10 @@ export function PublicHouseholdView({
               <UserProfileArea compact />
             ) : (
               <Link
-                href="/"
+                href="/login"
                 className="text-sm font-semibold text-blue-700"
               >
-                Back to Project AGAP
+                LGU sign in
               </Link>
             )}
           </div>
@@ -52,7 +52,7 @@ export function PublicHouseholdView({
               : "Gabay mula sa beripikadong advisory at aprubadong tuntunin. Hindi kailangan ng LGU account, buong pangalan, o eksaktong tirahan."}
           </p>
         </section>
-        <ConnectedHouseholdCard demoMode />
+        <ConnectedHouseholdCard />
         <footer className="border-t border-slate-200 pt-5 text-sm text-slate-600">
           {language === "en"
             ? "Confirm current instructions with your barangay or LGU. AGAP does not issue evacuation orders or declare homes safe."

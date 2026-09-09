@@ -89,8 +89,7 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
     [lockedBarangay, initialBarangay, requireBarangaySelection, barangays]
   );
 
-  const [mode, setMode] = useState<HouseholdMode>("quick-profile");
-  const [quickStep, setQuickStep] = useState<1 | 2 | 3>(1);
+  const [mode, setMode] = useState<HouseholdMode>("code");
   const [householdCode, setHouseholdCode] = useState("");
   const [selectedBarangay, setSelectedBarangay] = useState(defaultBarangay);
   const [householdSize, setHouseholdSize] = useState("");
@@ -435,30 +434,22 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
           {mode === "quick-profile" && (
             <form onSubmit={submitQuickProfile} className="space-y-5">
               <div>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="flex items-center gap-1.5 text-base font-bold text-slate-900">
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-base font-bold text-slate-900">
                     {language === "en" ? "Quick Household Profile" : "Quick Household Profile"}
-                    <HelpTooltip content={getHelpContent("quickHouseholdProfile", language)} align="left" />
                   </h2>
-                  <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-[10px] font-bold uppercase text-blue-800">
-                    Step {quickStep} of 3
-                  </span>
+                  <HelpTooltip
+                    content={getHelpContent("quickHouseholdProfile", language)}
+                    align="left"
+                  />
                 </div>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">
                   {language === "en"
                     ? "Answer only the questions needed to prepare relevant household guidance. Your name and exact address are not required."
                     : "Sagutin lamang ang mga tanong na kailangan para sa relevant household guidance. Hindi kailangan ang pangalan o eksaktong address."}
                 </p>
-                <div className="mt-4 grid grid-cols-3 gap-2" aria-label={`Step ${quickStep} of 3`}>
-                  {["Household", "Preparedness", "Communication"].map((label, index) => (
-                    <div key={label} className={`h-1.5 rounded-full ${quickStep >= index + 1 ? "bg-blue-600" : "bg-slate-200"}`}>
-                      <span className="sr-only">{label}</span>
-                    </div>
-                  ))}
-                </div>
               </div>
 
-              {quickStep === 1 ? <div className="space-y-5">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {lockedBarangay ? (
                   <div>
@@ -537,6 +528,21 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
                           : "PWD o may limitasyon sa paggalaw",
                       icon: <UserRound className="h-4 w-4" aria-hidden="true" />,
                     },
+                    {
+                      checked: hasEssentialMedicineNeed,
+                      setChecked: setHasEssentialMedicineNeed,
+                      label:
+                        language === "en"
+                          ? "Essential medicine need"
+                          : "May mahalagang gamot na kailangan",
+                      icon: <Pill className="h-4 w-4" aria-hidden="true" />,
+                    },
+                    {
+                      checked: hasPets,
+                      setChecked: setHasPets,
+                      label: language === "en" ? "Pets" : "May alagang hayop",
+                      icon: <PawPrint className="h-4 w-4" aria-hidden="true" />,
+                    },
                   ].map((item) => (
                     <label
                       key={item.label}
@@ -554,23 +560,7 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
                   ))}
                 </div>
               </fieldset>
-              </div> : null}
 
-              {quickStep === 2 ? <div className="space-y-5">
-              <fieldset>
-                <legend className="text-xs font-bold text-slate-700">Preparedness needs</legend>
-                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                  {[
-                    { checked: hasEssentialMedicineNeed, setChecked: setHasEssentialMedicineNeed, label: "Essential medicine need", icon: <Pill className="size-4" aria-hidden="true" /> },
-                    { checked: hasPets, setChecked: setHasPets, label: "Pets", icon: <PawPrint className="size-4" aria-hidden="true" /> },
-                  ].map((item) => (
-                    <label key={item.label} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-3 text-xs text-slate-700 hover:bg-slate-50">
-                      <input type="checkbox" checked={item.checked} onChange={(event) => item.setChecked(event.target.checked)} className="size-4 rounded border-slate-300 text-blue-600" />
-                      <span className="text-slate-500">{item.icon}</span><span className="font-medium">{item.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
               <label className="block">
                 <span className="text-xs font-bold text-slate-700">
                   {language === "en" ? "Home / Housing Information" : "Impormasyon tungkol sa Tahanan"}
@@ -587,9 +577,7 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
                   className="mt-2 w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                 />
               </label>
-              </div> : null}
 
-              {quickStep === 3 ? (
               <fieldset>
                 <legend className="text-xs font-bold text-slate-700">
                   {language === "en" ? "Ways You Can Receive Updates" : "Paraan ng Pagtanggap ng Updates"}
@@ -616,18 +604,23 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
                   })}
                 </div>
               </fieldset>
-              ) : null}
 
-              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-between">
-                {quickStep > 1 ? <button type="button" onClick={() => setQuickStep((quickStep - 1) as 1 | 2)} className="min-h-11 rounded-lg border border-slate-300 px-4 text-sm font-semibold text-slate-700">Back</button> : <span />}
-                {quickStep < 3 ? (
-                  <button type="button" onClick={() => { if (quickStep === 1 && (!selectedBarangay || !householdSize)) { setFormError("Select a barangay and enter household size before continuing."); return; } setFormError(""); setQuickStep((quickStep + 1) as 2 | 3); }} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700">Continue <ArrowRight className="size-4" aria-hidden="true" /></button>
-                ) : (
-                  <button type="submit" disabled={isGenerating} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
-                    {isGenerating ? "Preparing..." : "Generate Preparedness Card"}<ArrowRight className="size-4" aria-hidden="true" />
-                  </button>
-                )}
-              </div>
+              <button
+                type="submit"
+                disabled={isGenerating}
+                className="inline-flex min-h-[42px] items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <span>
+                  {isGenerating
+                    ? language === "en"
+                      ? "Preparing..."
+                      : "Inihahanda..."
+                    : language === "en"
+                      ? "Prepare Household Card"
+                      : "Ihanda ang Household Card"}
+                </span>
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </button>
             </form>
           )}
 
