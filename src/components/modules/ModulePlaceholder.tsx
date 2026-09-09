@@ -26,6 +26,63 @@ import {
   Shield,
 } from "lucide-react";
 
+
+type DamageReportSyncStatus = "PENDING_SYNC" | "SYNCED";
+type DamageReportVerificationStatus = "UNVERIFIED" | "VERIFIED";
+
+interface DamageVerificationReport {
+  id: string;
+  barangay: string;
+  incident: string;
+  severity: string;
+  reportedAffectedPersons: string;
+  reportedAffectedHouseholds: string;
+  reportedVulnerableGroups: string;
+  damageSummary: string;
+  criticalFacilityCondition: string;
+  serviceDisruption: string;
+  accessConditions: string;
+  priorityNeeds: string[];
+  reportSourceReference: string;
+  evidenceFileName: string | null;
+  evidenceNotes: string;
+  reportedAt: string;
+  syncStatus: DamageReportSyncStatus;
+  verificationStatus: DamageReportVerificationStatus;
+  verifiedBy?: string;
+  verifiedAt?: string;
+  isDemoSeed?: boolean;
+}
+
+const INITIAL_DAMAGE_VERIFICATION_REPORTS: DamageVerificationReport[] = [
+  {
+    id: "AGAP-DEMO-SYNC-001",
+    barangay: "Gulang-Gulang",
+    incident: "Blocked Access Road / Debris",
+    severity: "Moderate",
+    reportedAffectedPersons: "18",
+    reportedAffectedHouseholds: "5",
+    reportedVulnerableGroups: "2 older persons; 1 resident with mobility limitation",
+    damageSummary:
+      "Fallen branches and light structural debris were reported along a local access road. Passage is limited to one side while clearing is pending.",
+    criticalFacilityCondition:
+      "Barangay hall reported operational. No critical-facility closure reported in this demo record.",
+    serviceDisruption:
+      "Intermittent power interruption reported in part of the barangay.",
+    accessConditions:
+      "Road is partially passable; debris reduces vehicle access.",
+    priorityNeeds: ["Road Clearing Team", "Drinking Water"],
+    reportSourceReference: "Demo Field Responder — Barangay field observation",
+    evidenceFileName: "demo-field-photo.jpg",
+    evidenceNotes:
+      "Frontend demo synchronized report for LGU verification workflow.",
+    reportedAt: "9/9/2026, 8:48:00 PM",
+    syncStatus: "SYNCED",
+    verificationStatus: "UNVERIFIED",
+    isDemoSeed: true,
+  },
+];
+
 export const ModulePlaceholder: React.FC = () => {
   const {
     currentModule,
@@ -41,9 +98,11 @@ export const ModulePlaceholder: React.FC = () => {
     goToReportDamage,
   } = useNavigation();
   const { language, t } = useLanguage();
+  const isLguUser = !isBarangayUser && !isFieldResponderUser;
 
   // State for Dashboard advisory input
   const [isAdvisoryFormOpen, setIsAdvisoryFormOpen] = useState(false);
+  const [showAdvisorySavedNotice, setShowAdvisorySavedNotice] = useState(false);
 
   // Close the dashboard advisory editor when the user navigates to another module.
   useEffect(() => {
@@ -51,6 +110,16 @@ export const ModulePlaceholder: React.FC = () => {
       setIsAdvisoryFormOpen(false);
     }
   }, [currentModule]);
+
+  useEffect(() => {
+    if (!showAdvisorySavedNotice) return;
+
+    const timer = window.setTimeout(() => {
+      setShowAdvisorySavedNotice(false);
+    }, 2800);
+
+    return () => window.clearTimeout(timer);
+  }, [showAdvisorySavedNotice]);
 
   // State for Damage & Needs Report (reported data only; validation remains backend/LGU controlled)
   const [reportStep, setReportStep] = useState(1);
@@ -71,6 +140,54 @@ export const ModulePlaceholder: React.FC = () => {
   const [isReportSubmitted, setIsReportSubmitted] = useState(false);
   const [pendingReportId, setPendingReportId] = useState<string | null>(null);
   const [pendingReportTimestamp, setPendingReportTimestamp] = useState<string | null>(null);
+  const [damageReportNotification, setDamageReportNotification] = useState<string | null>(null);
+  const [showPendingSyncSavedNotice, setShowPendingSyncSavedNotice] = useState(false);
+
+  // LGU-only Damage & Needs verification workflow.
+  // Frontend state only until database synchronization is connected.
+  const [lguDamageView, setLguDamageView] = useState<
+    "new-report" | "verification"
+  >("new-report");
+  const [verificationQueueFilter, setVerificationQueueFilter] = useState<
+    "unverified" | "verified"
+  >("unverified");
+  const [verificationReports, setVerificationReports] = useState<
+    DamageVerificationReport[]
+  >(INITIAL_DAMAGE_VERIFICATION_REPORTS);
+  const [selectedVerificationReportId, setSelectedVerificationReportId] =
+    useState<string | null>(null);
+  const [showVerifyReportConfirm, setShowVerifyReportConfirm] = useState(false);
+  const [showReportVerifiedNotice, setShowReportVerifiedNotice] = useState(false);
+
+  useEffect(() => {
+    if (!damageReportNotification) return;
+
+    const timer = window.setTimeout(() => {
+      setDamageReportNotification(null);
+    }, 3200);
+
+    return () => window.clearTimeout(timer);
+  }, [damageReportNotification]);
+
+  useEffect(() => {
+    if (!showPendingSyncSavedNotice) return;
+
+    const timer = window.setTimeout(() => {
+      setShowPendingSyncSavedNotice(false);
+    }, 2400);
+
+    return () => window.clearTimeout(timer);
+  }, [showPendingSyncSavedNotice]);
+
+  useEffect(() => {
+    if (!showReportVerifiedNotice) return;
+
+    const timer = window.setTimeout(() => {
+      setShowReportVerifiedNotice(false);
+    }, 2600);
+
+    return () => window.clearTimeout(timer);
+  }, [showReportVerifiedNotice]);
 
   // State for Post Impact Action Card. The initial selection is navigation only, not an impact claim.
   const [selectedPostImpactBarangay, setSelectedPostImpactBarangay] = useState(
@@ -83,6 +200,9 @@ export const ModulePlaceholder: React.FC = () => {
   useEffect(() => {
     if (isBarangayUser) {
       setIsAdvisoryFormOpen(false);
+      setLguDamageView("new-report");
+      setSelectedVerificationReportId(null);
+      setShowVerifyReportConfirm(false);
       setSelectedReportBarangay(barangayUserName);
       setSelectedPostImpactBarangay(barangayUserName);
 
@@ -95,6 +215,9 @@ export const ModulePlaceholder: React.FC = () => {
 
     if (isFieldResponderUser) {
       setIsAdvisoryFormOpen(false);
+      setLguDamageView("new-report");
+      setSelectedVerificationReportId(null);
+      setShowVerifyReportConfirm(false);
 
       if (!isReportSubmitted) {
         // Field responders choose the barangay for every new report.
@@ -131,22 +254,13 @@ export const ModulePlaceholder: React.FC = () => {
       return (
         <div className="animate-in fade-in duration-200">
           <AdvisoryForm
-            initialValues={{
-              title: advisoryTitle,
-              source: advisory.source,
-              status: "ACTIVE",
-              issuedTime: advisory.issuedTime,
-              bulletinNumber: advisory.bulletinNumber,
-              message:
-                language === "en"
-                  ? advisory.leadParagraphEn
-                  : advisory.leadParagraphFil,
-              precautions:
-                language === "en"
-                  ? advisory.precautionsEn
-                  : advisory.precautionsFil,
-            }}
             onCancel={() => setIsAdvisoryFormOpen(false)}
+            onSave={async () => {
+              // Frontend demo: the real backend/database persistence will be
+              // connected here later. For now, complete the UI flow.
+              setIsAdvisoryFormOpen(false);
+              setShowAdvisorySavedNotice(true);
+            }}
           />
         </div>
       );
@@ -268,6 +382,35 @@ export const ModulePlaceholder: React.FC = () => {
 
     return (
       <div className="space-y-8 sm:space-y-10 animate-in fade-in duration-200">
+        {showAdvisorySavedNotice ? (
+          <div
+            className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/25 px-4 backdrop-blur-[2px]"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="w-full max-w-sm rounded-2xl border border-emerald-100 bg-white p-6 text-center shadow-2xl sm:p-7">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
+                <CheckCircle2
+                  className="h-8 w-8 text-emerald-600"
+                  aria-hidden="true"
+                />
+              </div>
+
+              <h2 className="mt-4 text-lg font-black tracking-tight text-slate-900">
+                {language === "en"
+                  ? "Advisory Saved Successfully"
+                  : "Matagumpay na Na-save ang Advisory"}
+              </h2>
+
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                {language === "en"
+                  ? "The advisory has been verified and saved. You are now back on Home."
+                  : "Na-verify at na-save ang advisory. Bumalik ka na sa Home."}
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         {/* Dashboard identity — intentionally spacious and minimal */}
         <header className="pt-1 sm:pt-2">
           <div className="max-w-2xl">
@@ -1146,12 +1289,585 @@ export const ModulePlaceholder: React.FC = () => {
   };
 
   // =========================================================================
+  // LGU DAMAGE & NEEDS: REPORT VERIFICATION
+  // =========================================================================
+  const renderLguDamageTabs = () => {
+    if (!isLguUser) return null;
+
+    const readyForReviewCount = verificationReports.filter(
+      (report) =>
+        report.syncStatus === "SYNCED" &&
+        report.verificationStatus === "UNVERIFIED"
+    ).length;
+
+    return (
+      <div className="rounded-xl border border-slate-200 bg-white p-1.5">
+        <div className="grid grid-cols-2 gap-1.5">
+          <button
+            type="button"
+            onClick={() => {
+              setLguDamageView("new-report");
+              setSelectedVerificationReportId(null);
+              setShowVerifyReportConfirm(false);
+            }}
+            className={`min-h-10 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+              lguDamageView === "new-report"
+                ? "bg-blue-600 text-white"
+                : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            New Report
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setLguDamageView("verification");
+              setSelectedVerificationReportId(null);
+              setShowVerifyReportConfirm(false);
+            }}
+            className={`flex min-h-10 items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition-colors ${
+              lguDamageView === "verification"
+                ? "bg-blue-600 text-white"
+                : "text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            <span>Reports for Verification</span>
+            {readyForReviewCount > 0 ? (
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] ${
+                  lguDamageView === "verification"
+                    ? "bg-white/20 text-white"
+                    : "bg-amber-100 text-amber-800"
+                }`}
+              >
+                {readyForReviewCount}
+              </span>
+            ) : null}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderLguVerificationQueue = () => {
+    const selectedReport =
+      verificationReports.find(
+        (report) => report.id === selectedVerificationReportId
+      ) ?? null;
+
+    const unverifiedReports = verificationReports.filter(
+      (report) => report.verificationStatus === "UNVERIFIED"
+    );
+    const verifiedReports = verificationReports.filter(
+      (report) => report.verificationStatus === "VERIFIED"
+    );
+
+    const visibleReports =
+      verificationQueueFilter === "unverified"
+        ? unverifiedReports
+        : verifiedReports;
+
+    const getSeverityBadgeClass = (severity: string) =>
+      severity === "Minor"
+        ? "border-yellow-200 bg-yellow-50 text-yellow-800"
+        : severity === "Moderate"
+          ? "border-orange-200 bg-orange-50 text-orange-800"
+          : "border-red-200 bg-red-50 text-red-700";
+
+    const verifySelectedReport = () => {
+      if (!selectedReport || selectedReport.syncStatus !== "SYNCED") return;
+
+      const verifiedAt = new Date().toLocaleString();
+
+      setVerificationReports((current) =>
+        current.map((report) =>
+          report.id === selectedReport.id
+            ? {
+                ...report,
+                verificationStatus: "VERIFIED",
+                verifiedBy: "Demo LGU User",
+                verifiedAt,
+              }
+            : report
+        )
+      );
+
+      setShowVerifyReportConfirm(false);
+      setSelectedVerificationReportId(null);
+      setVerificationQueueFilter("verified");
+      setShowReportVerifiedNotice(true);
+    };
+
+    if (selectedReport) {
+      const canVerify =
+        selectedReport.syncStatus === "SYNCED" &&
+        selectedReport.verificationStatus === "UNVERIFIED";
+
+      return (
+        <div className="mx-auto max-w-xl space-y-5 animate-in fade-in duration-200">
+          {showVerifyReportConfirm ? (
+            <div
+              className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/35 px-4 backdrop-blur-[2px]"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="verify-damage-report-title"
+            >
+              <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
+                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-700">
+                  <Shield className="h-6 w-6" aria-hidden="true" />
+                </div>
+
+                <h2
+                  id="verify-damage-report-title"
+                  className="mt-4 text-center text-lg font-black tracking-tight text-slate-900"
+                >
+                  Verify this report?
+                </h2>
+
+                <p className="mt-2 text-center text-sm leading-relaxed text-slate-600">
+                  Confirm that the submitted information has been reviewed against the available source and supporting evidence.
+                </p>
+
+                <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] leading-relaxed text-amber-900">
+                  Verification confirms review; it does not declare a location safe or replace authorized emergency command.
+                </div>
+
+                <div className="mt-6 grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setShowVerifyReportConfirm(false)}
+                    className="min-h-11 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={verifySelectedReport}
+                    className="min-h-11 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-700"
+                  >
+                    Confirm Verification
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {renderLguDamageTabs()}
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedVerificationReportId(null);
+                  setShowVerifyReportConfirm(false);
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-900"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                Back to verification queue
+              </button>
+
+              <h1 className="mt-3 text-2xl font-black tracking-tight text-slate-900">
+                Review Damage & Needs Report
+              </h1>
+
+              <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                Review the synchronized field report and available evidence before changing its verification status.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <span
+                className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                  selectedReport.syncStatus === "SYNCED"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-blue-200 bg-blue-50 text-blue-700"
+                }`}
+              >
+                {selectedReport.syncStatus === "SYNCED"
+                  ? "Synced"
+                  : "Pending Sync"}
+              </span>
+
+              <span
+                className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                  selectedReport.verificationStatus === "VERIFIED"
+                    ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : "border-amber-200 bg-amber-50 text-amber-700"
+                }`}
+              >
+                {selectedReport.verificationStatus === "VERIFIED"
+                  ? "Verified"
+                  : "Unverified"}
+              </span>
+            </div>
+          </div>
+
+          {selectedReport.isDemoSeed ? (
+            <div className="rounded-xl border border-blue-200 bg-blue-50/60 px-4 py-3 text-[11px] leading-relaxed text-blue-900">
+              <strong>Frontend demo synchronized report.</strong>{" "}
+              This sample exists so the LGU verification workflow can be demonstrated before database synchronization is connected.
+            </div>
+          ) : null}
+
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+            <div className="border-b border-slate-100 bg-slate-50/70 px-5 py-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    Client Report ID
+                  </p>
+                  <p className="mt-1 break-all text-xs font-bold text-slate-900">
+                    {selectedReport.id}
+                  </p>
+                </div>
+                <p className="text-xs text-slate-500">
+                  Reported: {selectedReport.reportedAt}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-6 p-5 sm:p-6">
+              <div>
+                <h2 className="text-xs font-black uppercase tracking-[0.12em] text-slate-700">
+                  Report identity
+                </h2>
+                <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <VerificationField label="Barangay" value={selectedReport.barangay} />
+                  <VerificationField label="Incident" value={selectedReport.incident} />
+                  <VerificationField
+                    label="Reported Damage Severity"
+                    value={selectedReport.severity}
+                  />
+                  <VerificationField
+                    label="Report Source / Reference"
+                    value={selectedReport.reportSourceReference}
+                  />
+                </dl>
+              </div>
+
+              <div>
+                <h2 className="text-xs font-black uppercase tracking-[0.12em] text-slate-700">
+                  Reported population impact
+                </h2>
+                <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <VerificationField
+                    label="Reported Affected Persons"
+                    value={selectedReport.reportedAffectedPersons || "Not reported"}
+                  />
+                  <VerificationField
+                    label="Reported Affected Households"
+                    value={selectedReport.reportedAffectedHouseholds || "Not reported"}
+                  />
+                  <VerificationField
+                    label="Reported Vulnerable Groups"
+                    value={selectedReport.reportedVulnerableGroups || "Not reported"}
+                  />
+                </dl>
+              </div>
+
+              <div>
+                <h2 className="text-xs font-black uppercase tracking-[0.12em] text-slate-700">
+                  Damage, conditions & needs
+                </h2>
+                <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <VerificationField
+                    label="Reported Damage Summary"
+                    value={selectedReport.damageSummary || "Not reported"}
+                    className="sm:col-span-2"
+                  />
+                  <VerificationField
+                    label="Status of Critical Facilities"
+                    value={selectedReport.criticalFacilityCondition || "Not reported"}
+                  />
+                  <VerificationField
+                    label="Lifeline Service Disruptions"
+                    value={selectedReport.serviceDisruption || "Not reported"}
+                  />
+                  <VerificationField
+                    label="Access Conditions"
+                    value={selectedReport.accessConditions || "Not reported"}
+                  />
+                  <VerificationField
+                    label="Priority Needs"
+                    value={
+                      selectedReport.priorityNeeds.length > 0
+                        ? selectedReport.priorityNeeds.join(", ")
+                        : "Not reported"
+                    }
+                  />
+                </dl>
+              </div>
+
+              <div>
+                <h2 className="text-xs font-black uppercase tracking-[0.12em] text-slate-700">
+                  Supporting evidence
+                </h2>
+                <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <VerificationField
+                    label="Evidence File"
+                    value={selectedReport.evidenceFileName || "No file attached"}
+                  />
+                  <VerificationField
+                    label="Evidence Notes"
+                    value={selectedReport.evidenceNotes || "No notes provided"}
+                  />
+                </dl>
+              </div>
+
+              {selectedReport.verificationStatus === "VERIFIED" ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2
+                      className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600"
+                      aria-hidden="true"
+                    />
+                    <div>
+                      <p className="text-xs font-bold text-emerald-900">
+                        Verified by {selectedReport.verifiedBy ?? "Authorized LGU User"}
+                      </p>
+                      <p className="mt-1 text-[11px] text-emerald-800">
+                        {selectedReport.verifiedAt ?? "Verification time unavailable"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : selectedReport.syncStatus === "PENDING_SYNC" ? (
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-[11px] leading-relaxed text-blue-900">
+                  <strong>Awaiting synchronization.</strong>{" "}
+                  This report cannot be verified until synchronization succeeds and the synchronized record is available to the LGU.
+                </div>
+              ) : (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] leading-relaxed text-amber-900">
+                  Review the reported information and available evidence. Verify only when the record is sufficiently supported for authorized LGU confirmation.
+                </div>
+              )}
+            </div>
+          </section>
+
+          <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedVerificationReportId(null);
+                setShowVerifyReportConfirm(false);
+              }}
+              className="min-h-11 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+            >
+              Back
+            </button>
+
+            {selectedReport.verificationStatus === "UNVERIFIED" ? (
+              <button
+                type="button"
+                disabled={!canVerify}
+                onClick={() => setShowVerifyReportConfirm(true)}
+                className="min-h-11 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+              >
+                {canVerify ? "Verify Report" : "Awaiting Sync"}
+              </button>
+            ) : null}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mx-auto max-w-xl space-y-5 animate-in fade-in duration-200">
+        {showReportVerifiedNotice ? (
+          <div
+            className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/25 px-4 backdrop-blur-[2px]"
+            role="status"
+            aria-live="polite"
+          >
+            <div className="w-full max-w-sm rounded-2xl border border-emerald-100 bg-white p-6 text-center shadow-2xl sm:p-7">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50">
+                <CheckCircle2 className="h-8 w-8 text-emerald-600" aria-hidden="true" />
+              </div>
+              <h2 className="mt-4 text-lg font-black tracking-tight text-slate-900">
+                Report Verified
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                The report has been marked Verified in this frontend demo.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        {renderLguDamageTabs()}
+
+        <header>
+          <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-blue-700">
+            LGU Review
+          </span>
+          <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
+            Reports for Verification
+          </h1>
+          <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
+            Review synchronized field reports before changing their verification status. Pending Sync reports remain unavailable for verification.
+          </p>
+        </header>
+
+        <div className="rounded-xl border border-blue-200 bg-blue-50/60 px-4 py-3 text-[11px] leading-relaxed text-blue-900">
+          <strong>Frontend verification demo.</strong>{" "}
+          In production, synchronized reports will come from the database and verification should update the report record and audit log.
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setVerificationQueueFilter("unverified")}
+            className={`rounded-lg border px-3 py-2 text-xs font-bold transition-colors ${
+              verificationQueueFilter === "unverified"
+                ? "border-amber-300 bg-amber-50 text-amber-800"
+                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            For Review ({unverifiedReports.length})
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setVerificationQueueFilter("verified")}
+            className={`rounded-lg border px-3 py-2 text-xs font-bold transition-colors ${
+              verificationQueueFilter === "verified"
+                ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+            }`}
+          >
+            Verified ({verifiedReports.length})
+          </button>
+        </div>
+
+        {visibleReports.length > 0 ? (
+          <div className="space-y-3">
+            {visibleReports.map((report) => {
+              const canReview =
+                report.syncStatus === "SYNCED" &&
+                report.verificationStatus === "UNVERIFIED";
+
+              return (
+                <article
+                  key={report.id}
+                  className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"
+                >
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${getSeverityBadgeClass(
+                            report.severity
+                          )}`}
+                        >
+                          {report.severity}
+                        </span>
+
+                        <span
+                          className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                            report.syncStatus === "SYNCED"
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                              : "border-blue-200 bg-blue-50 text-blue-700"
+                          }`}
+                        >
+                          {report.syncStatus === "SYNCED"
+                            ? "Synced"
+                            : "Pending Sync"}
+                        </span>
+
+                        {report.isDemoSeed ? (
+                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            Demo
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <h2 className="mt-3 text-base font-bold text-slate-900">
+                        Barangay {report.barangay}
+                      </h2>
+                      <p className="mt-1 text-xs font-semibold text-slate-700">
+                        {report.incident}
+                      </p>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        {report.reportSourceReference} • {report.reportedAt}
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={
+                        report.syncStatus === "PENDING_SYNC" &&
+                        report.verificationStatus === "UNVERIFIED"
+                      }
+                      onClick={() => setSelectedVerificationReportId(report.id)}
+                      className="min-h-10 shrink-0 rounded-lg border border-blue-200 bg-white px-4 py-2 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
+                    >
+                      {report.verificationStatus === "VERIFIED"
+                        ? "View Report"
+                        : canReview
+                          ? "Review Report"
+                          : "Awaiting Sync"}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-10 text-center">
+            <p className="text-sm font-bold text-slate-700">
+              {verificationQueueFilter === "unverified"
+                ? "No reports currently require review."
+                : "No verified reports yet."}
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // =========================================================================
   // VIEW 6: REPORT DAMAGE (Guided 6-Step Form, 1 Question Per Step)
   // =========================================================================
   const renderReportDamageScreen = () => {
+    if (isLguUser && lguDamageView === "verification") {
+      return renderLguVerificationQueue();
+    }
     if (isReportSubmitted) {
       return (
         <div className="mx-auto max-w-xl space-y-5 py-6 animate-in fade-in duration-200">
+          {renderLguDamageTabs()}
+
+          {showPendingSyncSavedNotice ? (
+            <div
+              className="fixed inset-0 z-[95] flex items-center justify-center bg-slate-950/25 px-4 backdrop-blur-[2px]"
+              role="status"
+              aria-live="polite"
+            >
+              <div className="w-full max-w-sm rounded-2xl border border-blue-100 bg-white p-6 text-center shadow-2xl sm:p-7">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50">
+                  <CheckCircle2
+                    className="h-8 w-8 text-blue-600"
+                    aria-hidden="true"
+                  />
+                </div>
+
+                <h2 className="mt-4 text-lg font-black tracking-tight text-slate-900">
+                  {language === "en"
+                    ? "Report Saved as Pending Sync"
+                    : "Na-save ang Report bilang Pending Sync"}
+                </h2>
+
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">
+                  {language === "en"
+                    ? "The field report was saved on this device and remains Unverified until synchronization and authorized LGU review."
+                    : "Na-save ang field report sa device na ito at mananatiling Unverified hanggang sa synchronization at authorized LGU review."}
+                </p>
+              </div>
+            </div>
+          ) : null}
+
           <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-5 sm:p-6">
             <div className="flex items-start gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-blue-700 ring-1 ring-blue-200">
@@ -1243,7 +1959,20 @@ export const ModulePlaceholder: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            {isLguUser ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setLguDamageView("verification");
+                  setSelectedVerificationReportId(null);
+                }}
+                className="rounded-lg border border-blue-200 bg-white px-4 py-2.5 text-xs font-bold text-blue-700 transition-colors hover:bg-blue-50"
+              >
+                Reports for Verification
+              </button>
+            ) : null}
+
             <button
               type="button"
               onClick={() => {
@@ -1265,6 +1994,8 @@ export const ModulePlaceholder: React.FC = () => {
                 setEvidenceFileName(null);
                 setPendingReportId(null);
                 setPendingReportTimestamp(null);
+                setDamageReportNotification(null);
+                setShowPendingSyncSavedNotice(false);
               }}
               className="rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-bold text-white transition-colors hover:bg-slate-800"
             >
@@ -1288,12 +2019,56 @@ export const ModulePlaceholder: React.FC = () => {
     ];
 
     const severityLevels = [
-      { id: "Minor", label: "Minor", desc: "Localized impact reported; requires normal validation." },
-      { id: "Moderate", label: "Moderate", desc: "Significant local impact reported; requires LGU review." },
+      {
+        id: "Minor",
+        label: "Minor",
+        desc: "Localized impact reported; requires normal validation.",
+        help:
+          language === "en"
+            ? {
+                title: "Minor — example situations",
+                description:
+                  "Examples: isolated roof or window damage, small debris with access still passable, brief localized service interruption, or limited property damage with no immediate life-safety concern observed.",
+              }
+            : {
+                title: "Minor — mga halimbawa",
+                description:
+                  "Halimbawa: isolated na sira sa bubong o bintana, kaunting debris ngunit nadadaanan pa ang daan, maikling localized service interruption, o limitadong property damage na walang nakikitang agarang banta sa buhay.",
+              },
+      },
+      {
+        id: "Moderate",
+        label: "Moderate",
+        desc: "Significant local impact reported; requires LGU review.",
+        help:
+          language === "en"
+            ? {
+                title: "Moderate — example situations",
+                description:
+                  "Examples: several households affected by flooding or structural damage, a road partly blocked or difficult to pass, service disruption affecting part of the barangay, or residents needing LGU assistance without an immediate rescue emergency.",
+              }
+            : {
+                title: "Moderate — mga halimbawa",
+                description:
+                  "Halimbawa: ilang household na apektado ng baha o structural damage, bahagyang barado o mahirap daanan na kalsada, service disruption sa bahagi ng barangay, o mga residenteng nangangailangan ng LGU assistance ngunit walang agarang rescue emergency.",
+              },
+      },
       {
         id: "Severe / Urgent",
         label: "Severe / Urgent",
         desc: "Potential life-safety concern reported; requires urgent authorized validation.",
+        help:
+          language === "en"
+            ? {
+                title: "Severe / Urgent — example situations",
+                description:
+                  "Examples: collapsed or heavily damaged structures, trapped or injured persons, dangerous flooding threatening residents, a major access route becoming impassable, serious critical-facility damage, or exposed electrical hazards creating an immediate life-safety concern.",
+              }
+            : {
+                title: "Severe / Urgent — mga halimbawa",
+                description:
+                  "Halimbawa: gumuhong o malubhang nasirang istruktura, trapped o injured na tao, mapanganib na pagbaha na nagbabanta sa residente, major access route na hindi madaanan, seryosong pinsala sa critical facility, o exposed electrical hazard na may agarang banta sa buhay.",
+              },
       },
     ];
 
@@ -1316,6 +2091,24 @@ export const ModulePlaceholder: React.FC = () => {
 
     return (
       <div className="max-w-xl mx-auto space-y-6 animate-in fade-in duration-200">
+        {renderLguDamageTabs()}
+
+        {damageReportNotification ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="fixed left-1/2 top-5 z-[80] flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-start gap-2.5 rounded-xl border border-emerald-200 bg-white px-4 py-3 text-emerald-900 shadow-lg"
+          >
+            <CheckCircle2
+              className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
+              aria-hidden="true"
+            />
+            <span className="text-xs font-semibold leading-5">
+              {damageReportNotification}
+            </span>
+          </div>
+        ) : null}
+
         <div>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
@@ -1346,6 +2139,13 @@ export const ModulePlaceholder: React.FC = () => {
               : "Mananatiling unverified ang iniulat na impormasyon hanggang masuri ng awtorisadong LGU user."}
           </p>
 
+          <p className="mt-2 text-[11px] font-medium text-slate-600">
+            <span className="font-black text-red-600" aria-hidden="true">*</span>{" "}
+            {language === "en"
+              ? "Questions and fields marked with an asterisk are required."
+              : "Ang mga tanong at field na may asterisk ay kailangang sagutan."}
+          </p>
+
           {isBarangayUser ? (
             <div className="mt-2 inline-flex items-center rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-[11px] font-semibold text-blue-900">
               Reporting barangay: Barangay {barangayUserName}
@@ -1369,9 +2169,17 @@ export const ModulePlaceholder: React.FC = () => {
         {reportStep === 1 && !isBarangayUser && (
           <div className="space-y-4">
             <h2 className="text-base font-bold text-slate-900">
-              {language === "en" ? "1. Which barangay are you reporting from?" : "1. Aling barangay ang iyong iniuulat?"}
+              {language === "en"
+                ? "1. Which barangay are you reporting from?"
+                : "1. Aling barangay ang iyong iniuulat?"}
+              <span className="ml-1 font-black text-red-600" aria-hidden="true">*</span>
             </h2>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div
+              className="grid grid-cols-2 gap-2.5"
+              role="group"
+              aria-label="Reporting barangay, required"
+              aria-required="true"
+            >
               {lucenaBarangays.map((bName) => (
                 <button
                   key={bName}
@@ -1398,6 +2206,7 @@ export const ModulePlaceholder: React.FC = () => {
                 {language === "en"
                   ? "2. What incident occurred?"
                   : "2. Anong uri ng insidente ang naganap?"}
+                <span className="ml-1 font-black text-red-600" aria-hidden="true">*</span>
               </h2>
               <div className="mt-1 flex items-start gap-1.5">
                 <p className="text-xs text-slate-500">
@@ -1412,7 +2221,12 @@ export const ModulePlaceholder: React.FC = () => {
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div
+              className="space-y-2"
+              role="group"
+              aria-label="Incident type, required"
+              aria-required="true"
+            >
               {incidentTypes.map((type) => (
                 <button
                   key={type}
@@ -1512,6 +2326,7 @@ export const ModulePlaceholder: React.FC = () => {
                   {language === "en"
                     ? "3. Reported Damage Severity"
                     : "3. Reported Damage Severity"}
+                  <span className="ml-1 font-black text-red-600" aria-hidden="true">*</span>
                 </h2>
                 <HelpTooltip
                   content={getHelpContent("fieldReportSeverity", language)}
@@ -1525,34 +2340,61 @@ export const ModulePlaceholder: React.FC = () => {
               </p>
             </div>
 
-            <div className="space-y-2.5">
-              {severityLevels.map((lvl) => (
-                <button
-                  key={lvl.id}
-                  type="button"
-                  onClick={() => setSelectedSeverity(lvl.id)}
-                  className={`w-full rounded-xl border p-4 text-left transition-all ${
-                    selectedSeverity === lvl.id
-                      ? "border-blue-600 bg-blue-600 text-white shadow-xs"
-                      : "border-slate-200 bg-white text-slate-800 hover:bg-slate-50"
-                  }`}
-                >
-                  <span className="block text-xs font-bold">{lvl.label}</span>
-                  <span
-                    className={`mt-0.5 block text-[11px] ${
-                      selectedSeverity === lvl.id ? "text-blue-100" : "text-slate-500"
-                    }`}
-                  >
-                    {lvl.desc}
-                  </span>
-                </button>
-              ))}
+            <div
+              className="space-y-2.5"
+              role="group"
+              aria-label="Reported damage severity, required"
+              aria-required="true"
+            >
+              {severityLevels.map((lvl) => {
+                const isSelected = selectedSeverity === lvl.id;
+
+                const severityClass =
+                  lvl.id === "Minor"
+                    ? isSelected
+                      ? "border-yellow-500 bg-yellow-100 text-yellow-950 shadow-xs"
+                      : "border-yellow-200 bg-yellow-50/60 text-slate-800 hover:bg-yellow-50"
+                    : lvl.id === "Moderate"
+                      ? isSelected
+                        ? "border-orange-500 bg-orange-500 text-white shadow-xs"
+                        : "border-orange-200 bg-orange-50/60 text-slate-800 hover:bg-orange-50"
+                      : isSelected
+                        ? "border-red-600 bg-red-600 text-white shadow-xs"
+                        : "border-red-200 bg-red-50/60 text-slate-800 hover:bg-red-50";
+
+                const descriptionClass =
+                  isSelected && lvl.id !== "Minor"
+                    ? "text-white/90"
+                    : lvl.id === "Minor" && isSelected
+                      ? "text-yellow-800"
+                      : "text-slate-500";
+
+                return (
+                  <div key={lvl.id} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSeverity(lvl.id)}
+                      className={`w-full rounded-xl border p-4 pr-12 text-left transition-all ${severityClass}`}
+                    >
+                      <span className="block text-xs font-bold">{lvl.label}</span>
+                      <span className={`mt-0.5 block text-[11px] ${descriptionClass}`}>
+                        {lvl.desc}
+                      </span>
+                    </button>
+
+                    <div className="absolute right-4 top-4">
+                      <HelpTooltip content={lvl.help} align="right" />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
             <label className="block">
               <span className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
                 <span>
                   {language === "en" ? "Reported Damage Summary" : "Reported Damage Summary"}
+                  <span className="ml-1 font-black text-red-600" aria-hidden="true">*</span>
                 </span>
                 <HelpTooltip
                   content={getHelpContent("reportedDamage", language)}
@@ -1562,6 +2404,8 @@ export const ModulePlaceholder: React.FC = () => {
               <textarea
                 value={damageSummary}
                 onChange={(event) => setDamageSummary(event.target.value)}
+                required
+                aria-required="true"
                 placeholder={
                   language === "en"
                     ? "Describe only observed or reported damage. Do not infer unreported damage."
@@ -1724,6 +2568,7 @@ export const ModulePlaceholder: React.FC = () => {
               <span className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
                 <span>
                   {language === "en" ? "Report Source / Reference" : "Report Source / Reference"}
+                  <span className="ml-1 font-black text-red-600" aria-hidden="true">*</span>
                 </span>
                 <HelpTooltip
                   content={getHelpContent("reportSourceEvidence", language)}
@@ -1733,6 +2578,8 @@ export const ModulePlaceholder: React.FC = () => {
               <input
                 value={reportSourceReference}
                 onChange={(event) => setReportSourceReference(event.target.value)}
+                required
+                aria-required="true"
                 placeholder={
                   language === "en"
                     ? "e.g. CDRRMO field team, barangay official, bulletin/ref no."
@@ -1757,9 +2604,18 @@ export const ModulePlaceholder: React.FC = () => {
                 type="file"
                 accept="image/*"
                 capture="environment"
-                onChange={(event) =>
-                  setEvidenceFileName(event.target.files?.[0]?.name ?? null)
-                }
+                onChange={(event) => {
+                  const selectedFile = event.target.files?.[0] ?? null;
+                  setEvidenceFileName(selectedFile?.name ?? null);
+
+                  if (selectedFile) {
+                    setDamageReportNotification(
+                      language === "en"
+                        ? "Photo evidence added successfully."
+                        : "Matagumpay na naidagdag ang photo evidence."
+                    );
+                  }
+                }}
                 className="mt-3 block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-white file:px-3 file:py-2 file:text-xs file:font-bold file:text-blue-700"
               />
               {evidenceFileName ? (
@@ -1887,9 +2743,39 @@ export const ModulePlaceholder: React.FC = () => {
                     ? `AGAP-${crypto.randomUUID()}`
                     : `AGAP-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
+                const generatedTimestamp = new Date().toLocaleString();
+
                 setPendingReportId(generatedId);
-                setPendingReportTimestamp(new Date().toLocaleString());
+                setPendingReportTimestamp(generatedTimestamp);
+
+                setVerificationReports((current) => [
+                  {
+                    id: generatedId,
+                    barangay:
+                      selectedReportBarangay ||
+                      (isBarangayUser ? barangayUserName : "Not selected"),
+                    incident: selectedIncident,
+                    severity: selectedSeverity,
+                    reportedAffectedPersons,
+                    reportedAffectedHouseholds,
+                    reportedVulnerableGroups,
+                    damageSummary,
+                    criticalFacilityCondition,
+                    serviceDisruption,
+                    accessConditions: accessibilityConstraints,
+                    priorityNeeds: selectedNeeds,
+                    reportSourceReference,
+                    evidenceFileName,
+                    evidenceNotes: photoNote,
+                    reportedAt: generatedTimestamp,
+                    syncStatus: "PENDING_SYNC",
+                    verificationStatus: "UNVERIFIED",
+                  },
+                  ...current.filter((report) => report.id !== generatedId),
+                ]);
+
                 setIsReportSubmitted(true);
+                setShowPendingSyncSavedNotice(true);
               }}
               className="rounded-xl bg-slate-900 px-6 py-2.5 text-xs font-bold text-white shadow-xs transition-colors hover:bg-slate-800"
             >
@@ -2027,3 +2913,27 @@ export const ModulePlaceholder: React.FC = () => {
 
   return renderHomeScreen();
 };
+
+interface VerificationFieldProps {
+  label: string;
+  value: string;
+  className?: string;
+}
+
+const VerificationField: React.FC<VerificationFieldProps> = ({
+  label,
+  value,
+  className = "",
+}) => (
+  <div
+    className={`rounded-xl border border-slate-200 bg-slate-50/70 p-4 ${className}`}
+  >
+    <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+      {label}
+    </dt>
+    <dd className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-slate-800">
+      {value || "—"}
+    </dd>
+  </div>
+);
+

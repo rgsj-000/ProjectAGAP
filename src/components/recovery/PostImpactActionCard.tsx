@@ -102,6 +102,25 @@ function display(value: string | null | undefined) {
   return value;
 }
 
+function printDisplay(value: string | null | undefined) {
+  if (value === null || value === undefined || value.trim() === "") {
+    return "Not available";
+  }
+
+  return value;
+}
+
+function escapeHtml(value: string | null | undefined) {
+  const source = value ?? "";
+
+  return source
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function MetricCard({
   label,
   value,
@@ -177,12 +196,12 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
   const printableCardRef = useRef<HTMLDivElement>(null);
 
   const printPostImpactCard = () => {
-    if (!printableCardRef.current || typeof window === "undefined") return;
+    if (typeof window === "undefined") return;
 
     const printWindow = window.open(
       "",
       "_blank",
-      "noopener,noreferrer,width=1000,height=850"
+      "noopener,noreferrer,width=1100,height=900"
     );
 
     if (!printWindow) {
@@ -190,63 +209,555 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
       return;
     }
 
-    const styles = Array.from(
-      document.querySelectorAll<HTMLLinkElement | HTMLStyleElement>(
-        'link[rel="stylesheet"], style'
-      )
-    )
-      .map((node) => node.outerHTML)
-      .join("\n");
+    const verificationState =
+      observedImpacts?.verificationState ?? "UNVERIFIED";
 
-    printWindow.document.open();
-    printWindow.document.write(`
+    const printedAt = new Date().toLocaleString();
+
+    const field = (label: string, value: string | null | undefined) => `
+      <div class="field">
+        <div class="field-label">${escapeHtml(label)}</div>
+        <div class="field-value ${printDisplay(value) === "Not available" ? "empty" : ""}">
+          ${escapeHtml(printDisplay(value))}
+        </div>
+      </div>
+    `;
+
+    const actionRows = (items: PostImpactActionItem[]) => {
+      if (items.length === 0) {
+        return `
+          <div class="empty-block">
+            No verified, source-based actions are available yet.
+          </div>
+        `;
+      }
+
+      return items
+        .map(
+          (item) => `
+            <div class="action-item">
+              <div class="action-head">
+                <strong>${escapeHtml(item.action)}</strong>
+                <span class="status-pill">
+                  ${escapeHtml(item.status?.replaceAll("_", " ") ?? "Not available")}
+                </span>
+              </div>
+              <div class="action-reason">
+                ${escapeHtml(printDisplay(item.whyItApplies))}
+              </div>
+              <div class="action-meta">
+                ${field("Evidence", item.evidence)}
+                ${field("Action Rule Reference", item.sourceRule)}
+                ${field("Responsible LGU Unit", item.responsibleUnit)}
+                ${field(
+                  "LGU Confirmation Required",
+                  item.confirmationRequired === null
+                    ? null
+                    : item.confirmationRequired
+                      ? "Required"
+                      : "Not required"
+                )}
+              </div>
+            </div>
+          `
+        )
+        .join("");
+    };
+
+    const printHtml = `
       <!doctype html>
       <html>
         <head>
           <meta charset="utf-8" />
           <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <title>Project AGAP - Post Impact Action Card - ${barangayName}</title>
-          ${styles}
+          <title>Project AGAP - Post Impact Action Card - ${escapeHtml(
+            barangayName
+          )}</title>
+
           <style>
+            * {
+              box-sizing: border-box;
+            }
+
             body {
               margin: 0;
-              padding: 24px;
-              background: #ffffff;
+              background: #e5e7eb;
               color: #0f172a;
               font-family: Arial, Helvetica, sans-serif;
             }
 
-            .agap-post-impact-print-card {
-              max-width: 900px !important;
-              margin: 0 auto !important;
-              border: 0 !important;
-              box-shadow: none !important;
+            .toolbar {
+              position: sticky;
+              top: 0;
+              z-index: 10;
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              gap: 16px;
+              padding: 12px 20px;
+              background: #ffffff;
+              border-bottom: 1px solid #dbe3ef;
             }
 
-            .agap-post-impact-print-hide {
-              display: none !important;
+            .toolbar-copy {
+              min-width: 0;
             }
 
-            @page {
-              size: auto;
-              margin: 14mm;
+            .toolbar-title {
+              font-size: 14px;
+              font-weight: 800;
+            }
+
+            .toolbar-note {
+              margin-top: 2px;
+              font-size: 11px;
+              color: #64748b;
+            }
+
+            .toolbar-actions {
+              display: flex;
+              gap: 8px;
+              flex-shrink: 0;
+            }
+
+            .toolbar button {
+              border: 1px solid #cbd5e1;
+              border-radius: 8px;
+              background: #ffffff;
+              padding: 9px 14px;
+              font-size: 12px;
+              font-weight: 700;
+              cursor: pointer;
+            }
+
+            .toolbar button.primary {
+              border-color: #0f172a;
+              background: #0f172a;
+              color: #ffffff;
+            }
+
+            .page-wrap {
+              padding: 24px;
+            }
+
+            .print-page {
+              width: 210mm;
+              min-height: 297mm;
+              margin: 0 auto;
+              background: #ffffff;
+              border: 1px solid #d7dee8;
+              box-shadow: 0 12px 34px rgba(15, 23, 42, 0.12);
+              padding: 14mm;
+            }
+
+            .doc-header {
+              display: flex;
+              justify-content: space-between;
+              gap: 20px;
+              padding-bottom: 14px;
+              border-bottom: 2px solid #0f172a;
+            }
+
+            .brand-kicker {
+              font-size: 10px;
+              font-weight: 800;
+              letter-spacing: 0.16em;
+              color: #1d4ed8;
+              text-transform: uppercase;
+            }
+
+            h1 {
+              margin: 5px 0 0;
+              font-size: 24px;
+              line-height: 1.15;
+            }
+
+            .barangay {
+              margin-top: 6px;
+              font-size: 13px;
+              color: #475569;
+            }
+
+            .doc-meta {
+              min-width: 185px;
+              text-align: right;
+              font-size: 10px;
+              color: #475569;
+            }
+
+            .verification {
+              display: inline-block;
+              margin-bottom: 7px;
+              border: 1px solid #f59e0b;
+              border-radius: 999px;
+              padding: 5px 9px;
+              background: #fffbeb;
+              color: #92400e;
+              font-weight: 800;
+              letter-spacing: 0.06em;
+              text-transform: uppercase;
+            }
+
+            .notice {
+              margin-top: 14px;
+              border: 1px solid #bfdbfe;
+              border-radius: 8px;
+              background: #eff6ff;
+              padding: 10px 12px;
+              font-size: 10px;
+              line-height: 1.5;
+              color: #1e3a8a;
+            }
+
+            .section {
+              margin-top: 18px;
+              break-inside: avoid;
+            }
+
+            .section-title {
+              margin: 0 0 8px;
+              padding-bottom: 5px;
+              border-bottom: 1px solid #cbd5e1;
+              font-size: 12px;
+              font-weight: 800;
+              letter-spacing: 0.04em;
+              text-transform: uppercase;
+            }
+
+            .grid-2,
+            .grid-3,
+            .grid-4 {
+              display: grid;
+              gap: 8px;
+            }
+
+            .grid-2 {
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .grid-3 {
+              grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+
+            .grid-4 {
+              grid-template-columns: repeat(4, minmax(0, 1fr));
+            }
+
+            .field {
+              min-width: 0;
+              border: 1px solid #dbe3ef;
+              border-radius: 7px;
+              background: #ffffff;
+              padding: 8px 9px;
+              break-inside: avoid;
+            }
+
+            .field-label {
+              font-size: 8.5px;
+              font-weight: 800;
+              letter-spacing: 0.05em;
+              color: #64748b;
+              text-transform: uppercase;
+            }
+
+            .field-value {
+              margin-top: 4px;
+              min-height: 16px;
+              font-size: 10.5px;
+              line-height: 1.45;
+              white-space: pre-wrap;
+              overflow-wrap: anywhere;
+            }
+
+            .field-value.empty {
+              color: #94a3b8;
+              font-style: italic;
+            }
+
+            .empty-block {
+              border: 1px dashed #cbd5e1;
+              border-radius: 7px;
+              padding: 12px;
+              font-size: 10px;
+              color: #64748b;
+              text-align: center;
+            }
+
+            .action-item {
+              margin-top: 8px;
+              border: 1px solid #dbe3ef;
+              border-radius: 8px;
+              padding: 10px;
+              break-inside: avoid;
+            }
+
+            .action-head {
+              display: flex;
+              justify-content: space-between;
+              gap: 12px;
+              font-size: 11px;
+            }
+
+            .status-pill {
+              flex-shrink: 0;
+              border: 1px solid #cbd5e1;
+              border-radius: 999px;
+              padding: 3px 7px;
+              font-size: 8px;
+              font-weight: 800;
+              color: #475569;
+              text-transform: uppercase;
+            }
+
+            .action-reason {
+              margin-top: 5px;
+              font-size: 9.5px;
+              line-height: 1.45;
+              color: #475569;
+            }
+
+            .action-meta {
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 7px;
+              margin-top: 8px;
+            }
+
+            .footer {
+              margin-top: 20px;
+              padding-top: 10px;
+              border-top: 1px solid #cbd5e1;
+              display: flex;
+              justify-content: space-between;
+              gap: 16px;
+              font-size: 8.5px;
+              line-height: 1.4;
+              color: #64748b;
+            }
+
+            .footer strong {
+              color: #334155;
+            }
+
+            @media print {
+              body {
+                background: #ffffff;
+              }
+
+              .toolbar {
+                display: none !important;
+              }
+
+              .page-wrap {
+                padding: 0;
+              }
+
+              .print-page {
+                width: auto;
+                min-height: auto;
+                margin: 0;
+                border: 0;
+                box-shadow: none;
+                padding: 0;
+              }
+
+              @page {
+                size: A4 portrait;
+                margin: 12mm;
+              }
+            }
+
+            @media screen and (max-width: 850px) {
+              .page-wrap {
+                overflow-x: auto;
+              }
             }
           </style>
         </head>
+
         <body>
-          ${printableCardRef.current.outerHTML}
-          <script>
-            window.onload = function () {
-              window.focus();
-              window.print();
-              window.onafterprint = function () {
-                window.close();
-              };
-            };
-          </script>
+          <div class="toolbar">
+            <div class="toolbar-copy">
+              <div class="toolbar-title">Post Impact Action Card — Print Preview</div>
+              <div class="toolbar-note">
+                Empty fields are intentionally shown as “Not available” for demonstration.
+              </div>
+            </div>
+
+            <div class="toolbar-actions">
+              <button onclick="window.close()">Close</button>
+              <button class="primary" onclick="window.print()">Print</button>
+            </div>
+          </div>
+
+          <div class="page-wrap">
+            <main class="print-page">
+              <header class="doc-header">
+                <div>
+                  <div class="brand-kicker">Project AGAP</div>
+                  <h1>Post Impact Action Card</h1>
+                  <div class="barangay">
+                    Barangay ${escapeHtml(barangayName)}
+                    ${
+                      eventName
+                        ? ` • ${escapeHtml(eventName)}`
+                        : ""
+                    }
+                  </div>
+                </div>
+
+                <div class="doc-meta">
+                  <div class="verification">
+                    ${escapeHtml(verificationState.replaceAll("_", " "))}
+                  </div>
+                  <div><strong>Generated:</strong> ${escapeHtml(printedAt)}</div>
+                  <div style="margin-top:3px;"><strong>Document:</strong> Post Impact Review</div>
+                </div>
+              </header>
+
+              <div class="notice">
+                Reported and validated information are kept separate. Empty fields in this
+                demonstration remain marked “Not available.” AGAP does not automatically
+                allocate relief, declare locations safe, or replace authorized LGU decisions.
+              </div>
+
+              <section class="section">
+                <h2 class="section-title">1. Social Impact — Affected Population & Households</h2>
+                <div class="grid-3">
+                  ${field(
+                    "Reported Affected Persons",
+                    observedImpacts?.reportedAffectedPersons
+                  )}
+                  ${field(
+                    "Validated Affected Persons",
+                    observedImpacts?.validatedAffectedPersons
+                  )}
+                  ${field(
+                    "Affected Persons Pending Validation",
+                    observedImpacts?.awaitingValidationPersons
+                  )}
+                  ${field(
+                    "Reported Affected Households",
+                    observedImpacts?.reportedAffectedHouseholds
+                  )}
+                  ${field(
+                    "Validated Affected Households",
+                    observedImpacts?.validatedAffectedHouseholds
+                  )}
+                  ${field(
+                    "Reported Vulnerable Groups",
+                    observedImpacts?.vulnerableGroupsReported
+                  )}
+                </div>
+
+                <div class="grid-2" style="margin-top:8px;">
+                  ${field(
+                    "Verification Status",
+                    verificationState.replaceAll("_", " ")
+                  )}
+                  ${field(
+                    "Last Validation Update",
+                    observedImpacts?.lastValidatedAt
+                  )}
+                </div>
+              </section>
+
+              <section class="section">
+                <h2 class="section-title">2. Damage, Status of Lifelines & Priority Needs</h2>
+                <div class="grid-2">
+                  ${field("Reported Damage", observedImpacts?.damageSummary)}
+                  ${field(
+                    "Status of Critical Facilities",
+                    observedImpacts?.criticalFacilityCondition
+                  )}
+                  ${field(
+                    "Lifeline Service Disruptions",
+                    observedImpacts?.serviceDisruption
+                  )}
+                  ${field(
+                    "Access Conditions",
+                    observedImpacts?.accessibilityConstraints
+                  )}
+                </div>
+
+                <div style="margin-top:8px;">
+                  ${field("Priority Needs", observedImpacts?.urgentUnmetNeeds)}
+                </div>
+              </section>
+
+              <section class="section">
+                <h2 class="section-title">3. Pre-Disaster Exposure vs Validated Post-Disaster Impact</h2>
+                <div class="grid-3">
+                  ${field(
+                    "Pre-Disaster Exposure Estimate",
+                    preEventComparison?.estimatedPotentiallyExposedPopulation
+                  )}
+                  ${field(
+                    "Estimation Method",
+                    preEventComparison?.estimateMethod
+                  )}
+                  ${field(
+                    "Confidence Level",
+                    preEventComparison?.estimateConfidence
+                  )}
+                </div>
+              </section>
+
+              <section class="section">
+                <h2 class="section-title">4. Information Pending Validation</h2>
+                ${
+                  dataGaps.length > 0
+                    ? `<div class="field">
+                        <div class="field-label">Information gaps / limitations</div>
+                        <div class="field-value">
+                          ${dataGaps
+                            .map(
+                              (gap, index) =>
+                                `${index + 1}. ${escapeHtml(gap)}`
+                            )
+                            .join("<br />")}
+                        </div>
+                      </div>`
+                    : `<div class="empty-block">
+                        No information gaps have been recorded yet.
+                      </div>`
+                }
+              </section>
+
+              <section class="section">
+                <h2 class="section-title">5. Immediate Response Actions</h2>
+                ${actionRows(immediateActions)}
+              </section>
+
+              <section class="section">
+                <h2 class="section-title">6. Stabilization and Early Recovery Actions</h2>
+                ${actionRows(stabilizationActions)}
+              </section>
+
+              <section class="section">
+                <h2 class="section-title">7. Mitigation / Ways Forward</h2>
+                ${actionRows(mitigationActions)}
+              </section>
+
+              <footer class="footer">
+                <div>
+                  <strong>Project AGAP</strong><br />
+                  AI-assisted disaster preparedness, response, and recovery decision support.
+                </div>
+
+                <div style="text-align:right;">
+                  This printout is a decision-support record.<br />
+                  Validation and operational decisions remain with authorized LGU personnel.
+                </div>
+              </footer>
+            </main>
+          </div>
         </body>
       </html>
-    `);
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(printHtml);
     printWindow.document.close();
   };
 

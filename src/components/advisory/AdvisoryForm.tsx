@@ -1,10 +1,10 @@
 "use client";
 
-import React, { FormEvent, useMemo, useRef, useState } from "react";
+import React, { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import HelpTooltip from "@/components/ui/HelpTooltip";
 import { getHelpContent, type HelpContentDefinition } from "@/lib/help-content";
-import { AlertCircle, FileText, Image as ImageIcon, Plus, ShieldCheck, Trash2, UploadCloud } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileText, Image as ImageIcon, Plus, ShieldCheck, Trash2, UploadCloud, X } from "lucide-react";
 
 export interface AdvisoryFormValues {
   title: string;
@@ -26,11 +26,28 @@ interface AdvisoryFormProps {
   onCancel?: () => void;
   onSave?: (values: AdvisoryFormValues, sourceFile: File | null) => void | Promise<void>;
   onFileChange?: (file: File | null) => void;
+
+  /**
+   * Upload-processing contract for the backend.
+   * The backend may:
+   * 1) store/process the source file,
+   * 2) return structured advisory fields immediately, or
+   * 3) return void and later provide the structured fields through processedValues.
+   */
+  onProcessFile?: (
+    file: File
+  ) => Promise<Partial<AdvisoryFormValues> | void>;
+
+  /**
+   * Structured advisory information returned by the backend/database after
+   * processing the uploaded official advisory file.
+   */
+  processedValues?: Partial<AdvisoryFormValues> | null;
 }
 
 const DEFAULT_VALUES: AdvisoryFormValues = {
   title: "",
-  source: "PAGASA • DOST",
+  source: "",
   status: "ACTIVE",
   issuedTime: "",
   bulletinNumber: "",
@@ -86,16 +103,121 @@ const toDateTimeLocalValue = (value?: string) => {
   return localTime.toISOString().slice(0, 16);
 };
 
+type FileWorkflowStage = "UPLOAD_READY" | "PROCESSING" | "REVIEW";
+
+type AdvisoryNotification = {
+  message: string;
+  kind: "success" | "info";
+} | null;
+
+const normalizeProcessedValues = (
+  incoming: Partial<AdvisoryFormValues>
+): AdvisoryFormValues => ({
+  ...DEFAULT_VALUES,
+  ...incoming,
+  issuedTime: toDateTimeLocalValue(incoming.issuedTime),
+  validity: toDateTimeLocalValue(incoming.validity),
+  precautions:
+    incoming.precautions && incoming.precautions.length > 0
+      ? incoming.precautions
+      : [],
+  verificationState: "FOR_REVIEW",
+});
+
+const DEMO_PROCESSING_DELAY_MS = 900;
+
+/**
+ * Frontend-only processed result for the supplied Post-Disaster.pdf demo file.
+ * This is intentionally isolated from the production backend contract.
+ */
+const POST_DISASTER_DEMO_VALUES: Partial<AdvisoryFormValues> = {
+  title:
+    "Tropical Storm MAAGAP (SIMULATION) – QUEZON — Post-Disaster Situation Bulletin Nr. 03",
+  source: "DOST-PAGASA — Weather Division",
+  status: "MONITORING",
+  issuedTime: "2026-09-14T08:00",
+  bulletinNumber: "POST-DISASTER SITUATION BULLETIN NR. 03",
+  validity: "",
+  affectedLocations:
+    "Quezon Province; Polillo Islands; General Nakar; Infanta; Real; Mauban; Atimonan; Lucena City; Tayabas City; Pagbilao; Sariaya; Gumaca; Lopez; Calauag; Bondoc Peninsula; nearby municipalities",
+  warningInformation:
+    "All Tropical Cyclone Wind Signals previously raised over Quezon Province are lifted. Residual rainfall, flooding, rain-induced landslides, damaged structures, fallen electrical lines, rough coastal waters, and occasional strong gusts may remain hazardous.",
+  sourceUrl: "https://bagong.pagasa.dost.gov.ph",
+  verificationState: "FOR_REVIEW",
+  message:
+    "Tropical Storm MAAGAP is moving away from Quezon Province and is forecast to weaken, but residual rainfall and other hazards may persist. The public and disaster risk reduction and management offices concerned should continue necessary response and early recovery measures and follow verified official advisories.",
+  precautions: [
+    "Continue observing safety precautions for residual rainfall, flooding, landslides, damaged structures, fallen electrical lines, and rough coastal waters.",
+    "Wait for official clearance before returning to evacuated communities.",
+    "Avoid damaged buildings, fallen electrical lines, leaning trees, unstable slopes, flooded roads, and areas undergoing clearing or utility-restoration operations.",
+    "Mariners of small seacrafts should not venture out to sea until conditions improve and maritime restrictions are lifted.",
+    "Monitor PAGASA and verified announcements from Quezon PDRRMO, city or municipal DRRM offices, and barangay officials.",
+  ],
+};
+
+const getFrontendDemoProcessedValues = (
+  file: File
+): Partial<AdvisoryFormValues> => {
+  const normalizedName = file.name.trim().toLowerCase();
+
+  if (normalizedName === "post-disaster.pdf") {
+    return POST_DISASTER_DEMO_VALUES;
+  }
+
+  // For any other file, do not invent extracted advisory content.
+  // The review screen will clearly show missing values until the real backend is connected.
+  return {
+    title: "",
+    source: "",
+    status: "ACTIVE",
+    issuedTime: "",
+    bulletinNumber: "",
+    validity: "",
+    affectedLocations: "",
+    warningInformation: "",
+    sourceUrl: "",
+    verificationState: "FOR_REVIEW",
+    message: "",
+    precautions: [],
+  };
+};
+
+const wait = (milliseconds: number) =>
+  new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+
+const displayValue = (value: string) => {
+  const trimmed = value.trim();
+  return trimmed || "—";
+};
+
+const displayDateTime = (value: string) => {
+  if (!value.trim()) return "—";
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+
+  return parsed.toLocaleString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+};
+
 export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
   initialValues,
   onCancel,
   onSave,
   onFileChange,
+  onProcessFile,
+  processedValues,
 }) => {
   const { language } = useLanguage();
   const [values, setValues] = useState<AdvisoryFormValues>({
     ...DEFAULT_VALUES,
     ...initialValues,
+    issuedTime: toDateTimeLocalValue(initialValues?.issuedTime),
     validity: toDateTimeLocalValue(initialValues?.validity),
     precautions:
       initialValues?.precautions && initialValues.precautions.length > 0
@@ -104,11 +226,18 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
-  const [localSuccess, setLocalSuccess] = useState(false);
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
+  const [processingError, setProcessingError] = useState("");
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [fileWorkflowStage, setFileWorkflowStage] =
+    useState<FileWorkflowStage>("UPLOAD_READY");
+  const [reviewValues, setReviewValues] =
+    useState<AdvisoryFormValues | null>(null);
+  const [reviewConfirmed, setReviewConfirmed] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [notification, setNotification] =
+    useState<AdvisoryNotification>(null);
 
   const copy = useMemo(
     () =>
@@ -118,16 +247,16 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             title: "Create or Update Advisory",
             description:
               "Record only verified information issued by PAGASA, DOST, Lucena CDRRMO, or another authorized source.",
-            verificationTitle: "Before saving",
+            verificationTitle: "Advisory input",
             verificationBody:
-              "Use only official source information. Check the source, reference, time, validity, affected locations, and verification status.",
+              "Upload the official advisory file or enter the advisory manually. Uploaded files must be processed and reviewed before the advisory can be saved.",
             titleLabel: "Advisory title",
             titlePlaceholder: "e.g. Severe Rainfall Advisory",
             sourceLabel: "Issuing source",
             sourcePlaceholder: "e.g. PAGASA • DOST",
             statusLabel: "Advisory status",
             issuedLabel: "Issued / updated time",
-            issuedPlaceholder: "e.g. Updated 11:00 AM Today",
+            issuedPlaceholder: "Select date and time",
             bulletinLabel: "Bulletin / reference number",
             bulletinPlaceholder: "e.g. Bulletin #4",
             validityLabel: "Validity / effective period",
@@ -151,38 +280,82 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             cancel: "Cancel",
             save: "Save advisory",
             saving: "Saving...",
-            localSuccess:
-              "Advisory information is ready for authorized review. It is not treated as verified until the required review is completed.",
+            proceedForVerification: "Proceed for Verification",
+            processingFile: "Processing file...",
+            saveVerified: "Save Verified Advisory",
+            fileUploadedTitle: "Official advisory file uploaded",
+            fileUploadedBody:
+              "The manual form is hidden. Continue to process the file and review the structured advisory information before saving.",
+            backendPendingTitle: "Processing official advisory",
+            backendPendingBody:
+              "AI and backend services are extracting and structuring the official advisory information. Please wait until processing is complete.",
+            processingOverlayTitle: "Processing official advisory",
+            processingOverlayBody:
+              "The uploaded file is being prepared for structured review. Other actions are temporarily unavailable.",
+            processingOverlayNote:
+              "Please wait. This frontend demo will continue automatically.",
+            demoPreviewBadge: "Demo processed preview",
+            demoPreviewNote:
+              "Frontend preview only. Post-Disaster.pdf uses the prepared sample values below; production will replace this with AI/backend extraction and database results.",
+            processingCompleteNotification:
+              "File processing complete. Review the structured advisory information before saving.",
+            processingError:
+              "The advisory file could not be processed. Try again or use manual advisory entry.",
+            reviewTitle: "Review Processed Advisory",
+            reviewBody:
+              "The information below is the standardized advisory record returned from the backend/database. Compare it with the uploaded official file before confirming.",
+            reviewSourceFile: "Source file",
+            reviewProcessingStatus: "Processing status",
+            reviewProcessingComplete: "Completed",
+            reviewVerificationStatus: "Verification status",
+            reviewForReview: "For Review",
+            reviewIdentitySection: "Advisory identification",
+            reviewTimingSection: "Timing and coverage",
+            reviewContentSection: "Advisory content",
+            reviewMissingValue: "Not provided in source",
+            reviewCorrectionNote:
+              "If any information is incorrect or unsupported by the official file, do not confirm or save the advisory. Replace the file or have the processed record corrected first.",
+            confirmationLabel:
+              "I confirm that the structured information shown above matches the official advisory file.",
+            verificationRequired:
+              "Confirm the reviewed information before saving the advisory.",
+            startOver: "Remove file and enter manually",
+            fileUploadedNotification: "Official advisory file uploaded successfully.",
+            advisorySavedNotification: "Advisory saved successfully.",
+            demoSavedNotification:
+              "Advisory verified and saved in the frontend demo.",
             required: "This field is required.",
             invalidUrl: "Enter a valid http:// or https:// source link.",
             precautionRequired: "Add at least one directive or precaution.",
             fileLabel: "Official advisory file",
             fileDescription:
-              "Attach the official bulletin or advisory used as the source record.",
+              "Attach the official bulletin or advisory. After upload, manual entry is hidden and the file proceeds through structured verification.",
             fileFormats: "PDF, PNG, JPG, or JPEG • Maximum 6 MB • One file",
             chooseFile: "Choose file",
             dropFile: "Drop the file here",
             replaceFile: "Replace file",
             removeFile: "Remove file",
-            fileReady: "Ready to upload when the advisory is saved",
+            fileReady: "File uploaded • Ready for processing",
             fileTooLarge: "File is larger than the 6 MB limit.",
             fileTypeInvalid: "Use a PDF, PNG, JPG, or JPEG file.",
+            manualDetailsTitle: "Manual advisory details",
+            manualDetailsRequired: "Required when no official file is attached",
           }
         : {
             eyebrow: "Official advisory input",
             title: "Gumawa o Mag-update ng Babala",
             description:
               "Itala lamang ang beripikadong impormasyong inilabas ng PAGASA, DOST, Lucena CDRRMO, o ibang awtorisadong ahensya.",
-            verificationTitle: "Bago i-save",
+            verificationTitle: "Advisory input",
             verificationBody:
-              "Gamitin lamang ang official source information. Suriin ang source, reference, oras, validity, affected locations, at verification status.",
+              "Mag-upload ng official advisory file o manu-manong ilagay ang advisory. Kailangang ma-process at ma-review ang uploaded file bago ma-save ang advisory.",
             titleLabel: "Pamagat ng babala",
             titlePlaceholder: "hal. Babala sa Malakas na Ulan",
             sourceLabel: "Ahensyang naglabas",
             sourcePlaceholder: "hal. PAGASA • DOST",
             statusLabel: "Advisory status",
             issuedLabel: "Oras ng paglabas / update",
-            issuedPlaceholder: "hal. Na-update 11:00 AM Ngayon",
+            issuedPlaceholder: "Piliin ang petsa at oras",
             bulletinLabel: "Bulletin / reference number",
             bulletinPlaceholder: "hal. Bulletin #4",
             validityLabel: "Validity / panahon ng bisa",
@@ -206,22 +379,66 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             cancel: "Kanselahin",
             save: "I-save ang babala",
             saving: "Sine-save...",
-            localSuccess:
-              "Handa na ang advisory information para sa authorized review. Hindi ito itinuturing na verified hangga't hindi tapos ang required review.",
+            proceedForVerification: "Magpatuloy sa Verification",
+            processingFile: "Pinoproseso ang file...",
+            saveVerified: "I-save ang Verified Advisory",
+            fileUploadedTitle: "Na-upload ang official advisory file",
+            fileUploadedBody:
+              "Nakatago na ang manual form. I-process ang file at i-review ang structured advisory information bago mag-save.",
+            backendPendingTitle: "Pinoproseso ang official advisory",
+            backendPendingBody:
+              "Kinukuha at inaayos ng AI at backend services ang official advisory information. Hintayin munang matapos ang processing.",
+            processingOverlayTitle: "Pinoproseso ang official advisory",
+            processingOverlayBody:
+              "Inihahanda ang uploaded file para sa structured review. Pansamantalang hindi available ang ibang actions.",
+            processingOverlayNote:
+              "Maghintay lamang. Awtomatikong magpapatuloy ang frontend demo.",
+            demoPreviewBadge: "Demo processed preview",
+            demoPreviewNote:
+              "Frontend preview lamang. Ginagamit ng Post-Disaster.pdf ang prepared sample values sa ibaba; papalitan ito ng AI/backend extraction at database results sa production.",
+            processingCompleteNotification:
+              "Tapos na ang file processing. I-review ang structured advisory information bago mag-save.",
+            processingError:
+              "Hindi ma-process ang advisory file. Subukan muli o gamitin ang manual advisory entry.",
+            reviewTitle: "I-review ang Processed Advisory",
+            reviewBody:
+              "Ang impormasyon sa ibaba ay ang standardized advisory record mula sa backend/database. Ihambing ito sa uploaded official file bago kumpirmahin.",
+            reviewSourceFile: "Source file",
+            reviewProcessingStatus: "Processing status",
+            reviewProcessingComplete: "Completed",
+            reviewVerificationStatus: "Verification status",
+            reviewForReview: "For Review",
+            reviewIdentitySection: "Advisory identification",
+            reviewTimingSection: "Timing at coverage",
+            reviewContentSection: "Advisory content",
+            reviewMissingValue: "Hindi nakasaad sa source",
+            reviewCorrectionNote:
+              "Kung may maling impormasyon o hindi suportado ng official file, huwag kumpirmahin o i-save ang advisory. Palitan ang file o ipa-correct muna ang processed record.",
+            confirmationLabel:
+              "Kinukumpirma ko na ang structured information sa itaas ay tugma sa official advisory file.",
+            verificationRequired:
+              "Kumpirmahin muna ang reviewed information bago i-save ang advisory.",
+            startOver: "Alisin ang file at manu-manong mag-enter",
+            fileUploadedNotification: "Matagumpay na na-upload ang official advisory file.",
+            advisorySavedNotification: "Matagumpay na na-save ang advisory.",
+            demoSavedNotification:
+              "Na-verify at na-save ang advisory sa frontend demo.",
             required: "Kinakailangan ang field na ito.",
             invalidUrl: "Maglagay ng valid na http:// o https:// source link.",
             precautionRequired: "Magdagdag ng kahit isang tagubilin o pag-iingat.",
             fileLabel: "Official advisory file",
             fileDescription:
-              "I-attach ang official bulletin o advisory na ginamit bilang source record.",
+              "I-attach ang official bulletin o advisory. Pagkatapos ng upload, nakatago ang manual entry at dadaan ang file sa structured verification.",
             fileFormats: "PDF, PNG, JPG, o JPEG • Maximum 6 MB • Isang file",
             chooseFile: "Pumili ng file",
             dropFile: "I-drop ang file dito",
             replaceFile: "Palitan ang file",
             removeFile: "Alisin ang file",
-            fileReady: "Handa nang i-upload kapag sine-save ang advisory",
+            fileReady: "Na-upload ang file • Handa para sa processing",
             fileTooLarge: "Lumampas ang file sa 6 MB limit.",
             fileTypeInvalid: "Gumamit ng PDF, PNG, JPG, o JPEG file.",
+            manualDetailsTitle: "Manual advisory details",
+            manualDetailsRequired: "Kailangan kapag walang naka-attach na official file",
           },
     [language]
   );
@@ -232,13 +449,15 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
   ) => {
     setValues((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: "" }));
-    setLocalSuccess(false);
   };
 
   const clearSourceFile = () => {
     setSourceFile(null);
     setFileError("");
-    setLocalSuccess(false);
+    setProcessingError("");
+    setReviewValues(null);
+    setReviewConfirmed(false);
+    setFileWorkflowStage("UPLOAD_READY");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -271,8 +490,15 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
 
     setSourceFile(file);
     setFileError("");
-    setLocalSuccess(false);
+    setProcessingError("");
+    setReviewValues(null);
+    setReviewConfirmed(false);
+    setFileWorkflowStage("UPLOAD_READY");
     onFileChange?.(file);
+    setNotification({
+      message: copy.fileUploadedNotification,
+      kind: "success",
+    });
   };
 
   const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -294,6 +520,29 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
     if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
     setIsDraggingFile(false);
   };
+
+  useEffect(() => {
+    if (!notification) return;
+
+    const timer = window.setTimeout(() => {
+      setNotification(null);
+    }, 3500);
+
+    return () => window.clearTimeout(timer);
+  }, [notification]);
+
+  useEffect(() => {
+    if (!sourceFile || !processedValues) return;
+
+    setReviewValues(normalizeProcessedValues(processedValues));
+    setReviewConfirmed(false);
+    setProcessingError("");
+    setFileWorkflowStage("REVIEW");
+    setNotification({
+      message: copy.processingCompleteNotification,
+      kind: "success",
+    });
+  }, [processedValues, sourceFile, copy.processingCompleteNotification]);
 
   const updatePrecaution = (index: number, value: string) => {
     const next = [...values.precautions];
@@ -319,17 +568,33 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
 
   const validate = () => {
     const nextErrors: Record<string, string> = {};
+    const hasOfficialFile = sourceFile !== null;
 
-    if (!values.title.trim()) nextErrors.title = copy.required;
-    if (!values.source.trim()) nextErrors.source = copy.required;
-    if (!values.issuedTime.trim()) nextErrors.issuedTime = copy.required;
-    if (!values.bulletinNumber.trim()) nextErrors.bulletinNumber = copy.required;
-    if (!values.validity.trim()) nextErrors.validity = copy.required;
-    if (!values.affectedLocations.trim()) nextErrors.affectedLocations = copy.required;
-    if (!values.warningInformation.trim()) nextErrors.warningInformation = copy.required;
-    if (!values.sourceUrl.trim()) {
-      nextErrors.sourceUrl = copy.required;
-    } else {
+    // A valid uploaded official advisory can serve as the source record.
+    // Without a file, the structured manual fields remain required.
+    if (!hasOfficialFile) {
+      if (!values.title.trim()) nextErrors.title = copy.required;
+      if (!values.source.trim()) nextErrors.source = copy.required;
+      if (!values.issuedTime.trim()) nextErrors.issuedTime = copy.required;
+      if (!values.bulletinNumber.trim()) nextErrors.bulletinNumber = copy.required;
+      if (!values.validity.trim()) nextErrors.validity = copy.required;
+      if (!values.affectedLocations.trim()) {
+        nextErrors.affectedLocations = copy.required;
+      }
+      if (!values.warningInformation.trim()) {
+        nextErrors.warningInformation = copy.required;
+      }
+      if (!values.sourceUrl.trim()) {
+        nextErrors.sourceUrl = copy.required;
+      }
+      if (!values.message.trim()) nextErrors.message = copy.required;
+      if (!values.precautions.some((item) => item.trim())) {
+        nextErrors.precautions = copy.precautionRequired;
+      }
+    }
+
+    // If a source link is entered in either mode, it still has to be valid.
+    if (values.sourceUrl.trim()) {
       try {
         const parsedUrl = new URL(values.sourceUrl.trim());
         if (!["http:", "https:"].includes(parsedUrl.protocol)) {
@@ -339,39 +604,130 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
         nextErrors.sourceUrl = copy.invalidUrl;
       }
     }
-    if (!values.message.trim()) nextErrors.message = copy.required;
-    if (!values.precautions.some((item) => item.trim())) {
-      nextErrors.precautions = copy.precautionRequired;
-    }
 
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
 
+  const sanitizeValues = (
+    source: AdvisoryFormValues
+  ): AdvisoryFormValues => ({
+    ...source,
+    title: source.title.trim(),
+    source: source.source.trim(),
+    issuedTime: source.issuedTime.trim(),
+    bulletinNumber: source.bulletinNumber.trim(),
+    validity: source.validity.trim(),
+    affectedLocations: source.affectedLocations.trim(),
+    warningInformation: source.warningInformation.trim(),
+    sourceUrl: source.sourceUrl.trim(),
+    message: source.message.trim(),
+    precautions: source.precautions.map((item) => item.trim()).filter(Boolean),
+  });
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    // FILE WORKFLOW:
+    // upload -> backend/database processing -> normalized review -> confirmation -> save
+    if (sourceFile) {
+      if (fileWorkflowStage === "UPLOAD_READY") {
+        setIsSaving(true);
+        setProcessingError("");
+        setFileWorkflowStage("PROCESSING");
+
+        try {
+          if (onProcessFile) {
+            const processed = await onProcessFile(sourceFile);
+
+            if (processed) {
+              setReviewValues(normalizeProcessedValues(processed));
+              setReviewConfirmed(false);
+              setFileWorkflowStage("REVIEW");
+              setNotification({
+                message: copy.processingCompleteNotification,
+                kind: "success",
+              });
+            }
+            // Production async processing may return void and later supply
+            // the normalized database record through processedValues.
+          } else {
+            // Frontend-only demo path: never wait forever for a backend that
+            // is not connected. Show a short blocking processing state, then
+            // reveal the prepared review format.
+            await wait(DEMO_PROCESSING_DELAY_MS);
+
+            const demoProcessed = getFrontendDemoProcessedValues(sourceFile);
+            setReviewValues(normalizeProcessedValues(demoProcessed));
+            setReviewConfirmed(false);
+            setFileWorkflowStage("REVIEW");
+            setNotification({
+              message: copy.processingCompleteNotification,
+              kind: "success",
+            });
+          }
+        } catch {
+          setProcessingError(copy.processingError);
+          setFileWorkflowStage("UPLOAD_READY");
+        } finally {
+          setIsSaving(false);
+        }
+
+        return;
+      }
+
+      if (fileWorkflowStage === "PROCESSING") {
+        return;
+      }
+
+      if (!reviewValues) {
+        setProcessingError(copy.backendPendingBody);
+        return;
+      }
+
+      if (!reviewConfirmed) {
+        setProcessingError(copy.verificationRequired);
+        return;
+      }
+
+      setIsSaving(true);
+      setProcessingError("");
+
+      try {
+        const verified = sanitizeValues({
+          ...reviewValues,
+          verificationState: "VERIFIED",
+        });
+
+        if (onSave) {
+          await onSave(verified, sourceFile);
+        } else {
+          setNotification({
+            message: copy.demoSavedNotification,
+            kind: "info",
+          });
+        }
+      } finally {
+        setIsSaving(false);
+      }
+
+      return;
+    }
+
+    // MANUAL WORKFLOW:
     if (!validate()) return;
 
-    const sanitized: AdvisoryFormValues = {
-      ...values,
-      title: values.title.trim(),
-      source: values.source.trim(),
-      issuedTime: values.issuedTime.trim(),
-      bulletinNumber: values.bulletinNumber.trim(),
-      validity: values.validity.trim(),
-      affectedLocations: values.affectedLocations.trim(),
-      warningInformation: values.warningInformation.trim(),
-      sourceUrl: values.sourceUrl.trim(),
-      message: values.message.trim(),
-      precautions: values.precautions.map((item) => item.trim()).filter(Boolean),
-    };
+    const sanitized = sanitizeValues(values);
 
     setIsSaving(true);
     try {
       if (onSave) {
-        await onSave(sanitized, sourceFile);
+        await onSave(sanitized, null);
       } else {
-        setLocalSuccess(true);
+        setNotification({
+          message: copy.demoSavedNotification,
+          kind: "info",
+        });
       }
     } finally {
       setIsSaving(false);
@@ -380,6 +736,37 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6" noValidate>
+      {notification ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed right-4 top-4 z-[70] flex max-w-sm items-start gap-2.5 rounded-xl border px-4 py-3 shadow-lg sm:right-6 sm:top-6 ${
+            notification.kind === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-blue-200 bg-blue-50 text-blue-900"
+          }`}
+        >
+          <CheckCircle2
+            className={`mt-0.5 h-4 w-4 shrink-0 ${
+              notification.kind === "success"
+                ? "text-emerald-600"
+                : "text-blue-600"
+            }`}
+            aria-hidden="true"
+          />
+          <span className="text-xs font-semibold leading-5">
+            {notification.message}
+          </span>
+          <button
+            type="button"
+            onClick={() => setNotification(null)}
+            className="ml-1 rounded p-0.5 opacity-60 transition-opacity hover:opacity-100"
+            aria-label="Dismiss notification"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        </div>
+      ) : null}
       <div>
         <p className="text-[11px] font-bold uppercase tracking-wider text-blue-700">
           {copy.eyebrow}
@@ -487,14 +874,16 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
-                  className="min-h-9 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                  disabled={fileWorkflowStage === "PROCESSING"}
+                  className="min-h-9 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {copy.replaceFile}
                 </button>
                 <button
                   type="button"
                   onClick={clearSourceFile}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-50"
+                  disabled={fileWorkflowStage === "PROCESSING"}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                   {copy.removeFile}
@@ -513,10 +902,34 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             {fileError}
           </p>
         ) : null}
+
+        {sourceFile && fileWorkflowStage === "UPLOAD_READY" ? (
+          <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50 p-3.5">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" aria-hidden="true" />
+            <div>
+              <p className="text-xs font-bold text-blue-900">
+                {copy.fileUploadedTitle}
+              </p>
+              <p className="mt-0.5 text-[11px] leading-5 text-blue-800">
+                {copy.fileUploadedBody}
+              </p>
+            </div>
+          </div>
+        ) : null}
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+      {!sourceFile ? (
+        <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+          <div className="mb-5 border-b border-slate-100 pb-4">
+            <h2 className="text-sm font-bold text-slate-900">
+              {copy.manualDetailsTitle}
+            </h2>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              {copy.manualDetailsRequired}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Field label={copy.titleLabel} error={errors.title} className="sm:col-span-2">
             <input
               value={values.title}
@@ -565,11 +978,13 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             helpContent={getHelpContent("advisoryIssuedTime", language)}
           >
             <input
+              type="datetime-local"
               value={values.issuedTime}
               onChange={(event) => updateField("issuedTime", event.target.value)}
-              placeholder={copy.issuedPlaceholder}
+              step={60}
               className={inputClass(Boolean(errors.issuedTime))}
               aria-invalid={Boolean(errors.issuedTime)}
+              aria-label={copy.issuedPlaceholder}
             />
           </Field>
 
@@ -727,21 +1142,190 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
               </button>
             </div>
           </Field>
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      {localSuccess && (
+      {sourceFile && fileWorkflowStage === "REVIEW" && reviewValues ? (
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+          <div className="border-b border-slate-200 bg-slate-50/70 px-5 py-5 sm:px-6">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                    <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    {copy.reviewProcessingComplete}
+                  </span>
+                  <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                    {copy.reviewForReview}
+                  </span>
+                </div>
+                <h2 className="mt-3 text-lg font-black tracking-tight text-slate-900">
+                  {copy.reviewTitle}
+                </h2>
+                <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-500">
+                  {copy.reviewBody}
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-xs sm:min-w-[220px]">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {copy.reviewSourceFile}
+                </span>
+                <p className="mt-1 truncate font-semibold text-slate-900">
+                  {sourceFile.name}
+                </p>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  {formatFileSize(sourceFile.size)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6 p-5 sm:p-6">
+            {!onProcessFile ? (
+              <div className="rounded-xl border border-blue-200 bg-blue-50/60 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full border border-blue-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-700">
+                    {copy.demoPreviewBadge}
+                  </span>
+                  <p className="text-[11px] leading-relaxed text-blue-900">
+                    {copy.demoPreviewNote}
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            <ReviewSection title={copy.reviewIdentitySection}>
+              <ReviewValue
+                label={copy.titleLabel}
+                value={reviewValues.title}
+                missingLabel={copy.reviewMissingValue}
+                className="sm:col-span-2"
+              />
+              <ReviewValue
+                label={copy.sourceLabel}
+                value={reviewValues.source}
+                missingLabel={copy.reviewMissingValue}
+              />
+              <ReviewValue
+                label={copy.bulletinLabel}
+                value={reviewValues.bulletinNumber}
+                missingLabel={copy.reviewMissingValue}
+              />
+              <ReviewValue
+                label={copy.statusLabel}
+                value={reviewValues.status}
+                missingLabel={copy.reviewMissingValue}
+              />
+              <ReviewValue
+                label={copy.reviewVerificationStatus}
+                value={copy.reviewForReview}
+                missingLabel={copy.reviewMissingValue}
+              />
+            </ReviewSection>
+
+            <ReviewSection title={copy.reviewTimingSection}>
+              <ReviewValue
+                label={copy.issuedLabel}
+                value={displayDateTime(reviewValues.issuedTime)}
+                missingLabel={copy.reviewMissingValue}
+              />
+              <ReviewValue
+                label={copy.validityLabel}
+                value={displayDateTime(reviewValues.validity)}
+                missingLabel={copy.reviewMissingValue}
+              />
+              <ReviewValue
+                label={copy.affectedLocationsLabel}
+                value={reviewValues.affectedLocations}
+                missingLabel={copy.reviewMissingValue}
+                className="sm:col-span-2"
+              />
+            </ReviewSection>
+
+            <ReviewSection title={copy.reviewContentSection}>
+              <ReviewValue
+                label={copy.warningInformationLabel}
+                value={reviewValues.warningInformation}
+                missingLabel={copy.reviewMissingValue}
+                className="sm:col-span-2"
+              />
+              <ReviewValue
+                label={copy.messageLabel}
+                value={reviewValues.message}
+                missingLabel={copy.reviewMissingValue}
+                className="sm:col-span-2"
+              />
+              <ReviewValue
+                label={copy.sourceUrlLabel}
+                value={reviewValues.sourceUrl}
+                missingLabel={copy.reviewMissingValue}
+                className="sm:col-span-2"
+              />
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 sm:col-span-2">
+                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {copy.precautionsLabel}
+                </span>
+                {reviewValues.precautions.length > 0 ? (
+                  <ol className="mt-2 space-y-2 pl-5 text-xs leading-relaxed text-slate-800">
+                    {reviewValues.precautions.map((item, index) => (
+                      <li key={`${item}-${index}`} className="list-decimal">
+                        {item}
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="mt-1.5 text-xs italic text-slate-500">
+                    {copy.reviewMissingValue}
+                  </p>
+                )}
+              </div>
+            </ReviewSection>
+
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] leading-relaxed text-amber-900">
+              {copy.reviewCorrectionNote}
+            </div>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-blue-200 bg-blue-50/60 p-4">
+              <input
+                type="checkbox"
+                checked={reviewConfirmed}
+                onChange={(event) => {
+                  setReviewConfirmed(event.target.checked);
+                  setProcessingError("");
+                }}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-xs font-semibold leading-relaxed text-blue-950">
+                {copy.confirmationLabel}
+              </span>
+            </label>
+          </div>
+        </section>
+      ) : null}
+
+      {processingError ? (
         <div
-          role="status"
-          className="flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50 p-3.5 text-xs text-blue-900"
+          role="alert"
+          className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-800"
         >
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{copy.localSuccess}</span>
+          <span>{processingError}</span>
         </div>
-      )}
+      ) : null}
 
       <div className="flex flex-col-reverse gap-2 border-t border-slate-200 pt-4 sm:flex-row sm:justify-end">
-        {onCancel && (
+        {sourceFile ? (
+          <button
+            type="button"
+            onClick={clearSourceFile}
+            className="min-h-11 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            {copy.startOver}
+          </button>
+        ) : onCancel ? (
           <button
             type="button"
             onClick={onCancel}
@@ -749,16 +1333,126 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
           >
             {copy.cancel}
           </button>
-        )}
+        ) : null}
+
         <button
           type="submit"
-          disabled={isSaving}
+          disabled={
+            isSaving ||
+            (sourceFile !== null && fileWorkflowStage === "PROCESSING") ||
+            (sourceFile !== null &&
+              fileWorkflowStage === "REVIEW" &&
+              !reviewConfirmed)
+          }
           className="min-h-11 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isSaving ? copy.saving : copy.save}
+          {sourceFile
+            ? fileWorkflowStage === "UPLOAD_READY"
+              ? isSaving
+                ? copy.processingFile
+                : copy.proceedForVerification
+              : fileWorkflowStage === "PROCESSING"
+                ? copy.processingFile
+                : isSaving
+                  ? copy.saving
+                  : copy.saveVerified
+            : isSaving
+              ? copy.saving
+              : copy.save}
         </button>
       </div>
+
+      {sourceFile && fileWorkflowStage === "PROCESSING" ? (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-busy="true"
+          aria-labelledby="advisory-processing-title"
+          aria-describedby="advisory-processing-description"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-white/60 bg-white p-6 text-center shadow-2xl sm:p-7">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50">
+              <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-blue-100 border-t-blue-600" />
+            </div>
+
+            <h2
+              id="advisory-processing-title"
+              className="mt-4 text-lg font-black tracking-tight text-slate-900"
+            >
+              {copy.processingOverlayTitle}
+            </h2>
+
+            <p
+              id="advisory-processing-description"
+              className="mt-2 text-sm leading-relaxed text-slate-600"
+            >
+              {copy.processingOverlayBody}
+            </p>
+
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-left">
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                {copy.reviewSourceFile}
+              </span>
+              <p className="mt-1 truncate text-xs font-semibold text-slate-900">
+                {sourceFile.name}
+              </p>
+            </div>
+
+            <p className="mt-4 text-[11px] leading-relaxed text-slate-500">
+              {copy.processingOverlayNote}
+            </p>
+          </div>
+        </div>
+      ) : null}
     </form>
+  );
+};
+
+interface ReviewSectionProps {
+  title: string;
+  children: React.ReactNode;
+}
+
+const ReviewSection: React.FC<ReviewSectionProps> = ({ title, children }) => (
+  <section>
+    <h3 className="mb-3 text-xs font-black uppercase tracking-[0.12em] text-slate-700">
+      {title}
+    </h3>
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>
+  </section>
+);
+
+interface ReviewValueProps {
+  label: string;
+  value: string;
+  missingLabel: string;
+  className?: string;
+}
+
+const ReviewValue: React.FC<ReviewValueProps> = ({
+  label,
+  value,
+  missingLabel,
+  className = "",
+}) => {
+  const normalized = value.trim();
+
+  return (
+    <div
+      className={`rounded-xl border border-slate-200 bg-slate-50/70 p-4 ${className}`}
+    >
+      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        {label}
+      </span>
+      <p
+        className={`mt-1.5 whitespace-pre-wrap text-xs leading-relaxed ${
+          normalized ? "text-slate-800" : "italic text-slate-500"
+        }`}
+      >
+        {normalized || missingLabel}
+      </p>
+    </div>
   );
 };
 
