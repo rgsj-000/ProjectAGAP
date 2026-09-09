@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import { useNavigation } from "@/context/NavigationContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { PRIMARY_NAV_ITEMS, NavItemConfig } from "@/lib/mock-data";
@@ -56,30 +57,31 @@ export const AppSidebar: React.FC = () => {
       aria-label="Project AGAP primary navigation"
     >
       {/* Project identity */}
-      <div className="p-6 border-b border-slate-100">
-        <button
-          type="button"
-          onClick={() => setCurrentModule("home")}
-          className="text-left group block w-full"
-          aria-label={language === "en" ? "Go to Home" : "Pumunta sa Tahanan"}
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-blue-700 flex items-center justify-center text-white font-bold text-base shadow-xs">
-              A
-            </div>
+        <div className="border-b border-slate-100 px-5 py-4">
+          <button
+            type="button"
+            onClick={() => setCurrentModule("home")}
+            className="group block w-full text-left"
+            aria-label={language === "en" ? "Go to Home" : "Pumunta sa Tahanan"}
+          >
+            <Image
+              src="/images/branding/project-agap-logo-horizontal.png"
+              alt="Project AGAP"
+              width={1600}
+              height={450}
+              priority
+              className="h-auto w-full max-w-[190px] object-contain"
+            />
 
-            <div className="min-w-0">
-              <span className="font-black text-slate-900 tracking-tight text-base block group-hover:text-blue-700 transition-colors">
-                PROJECT AGAP
-              </span>
-              <span className="text-[11px] text-slate-400 flex items-center gap-1 font-medium">
-                <MapPin className="w-3 h-3 text-slate-400 shrink-0" aria-hidden="true" />
-                <span className="truncate">Lucena City, Quezon</span>
-              </span>
-            </div>
-          </div>
-        </button>
-      </div>
+            <span className="mt-2 flex items-center gap-1 text-[11px] font-medium text-slate-400">
+              <MapPin
+                className="h-3 w-3 shrink-0 text-slate-400"
+                aria-hidden="true"
+              />
+              <span>Lucena City, Quezon</span>
+            </span>
+          </button>
+        </div>
 
       {/* Primary operational navigation */}
       <nav className="flex-1 px-3 py-5 space-y-1" aria-label="Main sections">

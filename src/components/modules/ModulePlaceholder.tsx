@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import Image from "next/image";
 import { useNavigation } from "@/context/NavigationContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { AdvisoryForm } from "@/components/advisory/AdvisoryForm";
@@ -288,18 +289,63 @@ export const ModulePlaceholder: React.FC = () => {
     const advisory = CURRENT_OFFICIAL_ADVISORY;
     const advisoryTitle = language === "en" ? advisory.titleEn : advisory.titleFil;
 
+    const preparednessActions = [
+      {
+        id: "barangay-assessments",
+        category: language === "en" ? "Assessment" : "Pagtatasa",
+        title: t("taskSeePriorities"),
+        description: t("taskSeePrioritiesDesc"),
+        actionLabel: language === "en" ? "Open Assessment" : "Buksan ang Assessment",
+        image: "/images/preparedness/barangay-assessments.png",
+        onClick: goToPriorityBarangays,
+      },
+      {
+        id: "barangay-information",
+        category: language === "en" ? "Barangay Data" : "Datos ng Barangay",
+        title: t("taskViewBarangayInfo"),
+        description: t("taskViewBarangayInfoDesc"),
+        actionLabel: language === "en" ? "View Information" : "Tingnan ang Impormasyon",
+        image: "/images/preparedness/barangay-information.png",
+        onClick: () => setPrepareSubView("barangay-info"),
+      },
+      {
+        id: "preparedness-brief",
+        category: language === "en" ? "Responder Brief" : "Brief ng Responder",
+        title: t("taskCreateBrief"),
+        description: t("taskCreateBriefDesc"),
+        actionLabel: language === "en" ? "Create Brief" : "Gumawa ng Brief",
+        image: "/images/preparedness/preparedness-brief.png",
+        onClick: () => setPrepareSubView("prep-brief"),
+      },
+      {
+        id: "household-action-card",
+        category: language === "en" ? "Household" : "Sambahayan",
+        title: t("taskCreateActionCard"),
+        description: t("taskCreateActionCardDesc"),
+        actionLabel: language === "en" ? "Create Card" : "Gumawa ng Card",
+        image: "/images/preparedness/household-action-card.png",
+        onClick: () => setPrepareSubView("action-card"),
+      },
+    ];
+
+    const workflowSteps =
+      language === "en"
+        ? ["01 Assess", "02 Understand", "03 Brief", "04 Guide"]
+        : ["01 Tasa", "02 Unawain", "03 Brief", "04 Gabay"];
+
     return (
-      <div className="space-y-8 animate-in fade-in duration-200">
+      <div className="space-y-7 animate-in fade-in duration-200">
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
             {t("prepareTitle")}
           </h1>
-          <div className="mt-2 text-xs text-slate-500 flex items-center gap-2">
+
+          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500">
             <span>{t("currentOfficialAdvisory")}</span>
             <button
               type="button"
               onClick={() => setIsAdvisoryModalOpen(true)}
-              className="font-bold text-slate-800 hover:text-blue-700 underline"
+              className="font-bold text-slate-800 underline underline-offset-2 transition-colors hover:text-blue-700"
             >
               {advisoryTitle}
             </button>
@@ -307,88 +353,120 @@ export const ModulePlaceholder: React.FC = () => {
           </div>
         </div>
 
-        <div>
-          <h2 className="text-sm font-bold text-slate-900 mb-3">
-            {t("whatWouldYouLikeToDo")}
-          </h2>
+        {/* Preparedness overview */}
+        <section
+          aria-labelledby="preparedness-overview-heading"
+          className="overflow-hidden rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-50/90 via-white to-slate-50 shadow-sm"
+        >
+          <div className="flex flex-col gap-5 p-5 sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-start gap-4">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-white text-blue-700 shadow-sm">
+                <Shield className="h-5 w-5" aria-hidden="true" />
+              </div>
 
-          <div className="divide-y divide-slate-100 bg-white rounded-2xl border border-slate-200 overflow-hidden">
-            {/* Action 1: See Priority Barangays */}
-            <button
-              type="button"
-              onClick={goToPriorityBarangays}
-              className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors group"
-            >
-              <div>
-                <span className="text-sm font-bold text-slate-900 group-hover:text-blue-700 flex items-center gap-2">
-                  <span>→</span>
-                  <span>{t("taskSeePriorities")}</span>
-                </span>
-                <p className="text-xs text-slate-500 mt-0.5 ml-4">
-                  {t("taskSeePrioritiesDesc")}
+              <div className="min-w-0">
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-700">
+                  {language === "en" ? "Preparedness Overview" : "Preparedness Overview"}
+                </p>
+                <h2
+                  id="preparedness-overview-heading"
+                  className="mt-1 text-base font-bold text-slate-900 sm:text-lg"
+                >
+                  {language === "en"
+                    ? "Turn verified information into practical preparedness workflows."
+                    : "Gawing practical preparedness workflows ang beripikadong impormasyon."}
+                </h2>
+                <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-slate-500 sm:text-sm">
+                  {language === "en"
+                    ? "Move from assessment to usable guidance using documented data, evidence, and verified advisory information when available."
+                    : "Mula assessment hanggang usable guidance, gamitin ang dokumentadong data, ebidensya, at verified advisory information kapag available."}
                 </p>
               </div>
-              <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-transform group-hover:translate-x-1" />
-            </button>
+            </div>
 
-            {/* Action 2: View Barangay Information */}
-            <button
-              type="button"
-              onClick={() => setPrepareSubView("barangay-info")}
-              className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors group"
-            >
-              <div>
-                <span className="text-sm font-bold text-slate-900 group-hover:text-blue-700 flex items-center gap-2">
-                  <span>→</span>
-                  <span>{t("taskViewBarangayInfo")}</span>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:max-w-[390px] lg:justify-end">
+              {workflowSteps.map((step) => (
+                <span
+                  key={step}
+                  className="rounded-full border border-blue-100 bg-white px-3 py-1.5 text-center text-[10px] font-bold uppercase tracking-wide text-slate-600 shadow-sm"
+                >
+                  {step}
                 </span>
-                <p className="text-xs text-slate-500 mt-0.5 ml-4">
-                  {t("taskViewBarangayInfoDesc")}
-                </p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-transform group-hover:translate-x-1" />
-            </button>
-
-            {/* Action 3: Create Preparedness Brief */}
-            <button
-              type="button"
-              onClick={() => setPrepareSubView("prep-brief")}
-              className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors group"
-            >
-              <div>
-                <span className="text-sm font-bold text-slate-900 group-hover:text-blue-700 flex items-center gap-2">
-                  <span>→</span>
-                  <span>{t("taskCreateBrief")}</span>
-                </span>
-                <p className="text-xs text-slate-500 mt-0.5 ml-4">
-                  {t("taskCreateBriefDesc")}
-                </p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-transform group-hover:translate-x-1" />
-            </button>
-
-            {/* Action 4: Create Household Action Card */}
-            <button
-              type="button"
-              onClick={() => setPrepareSubView("action-card")}
-              className="w-full p-4 sm:p-5 flex items-center justify-between text-left hover:bg-slate-50 transition-colors group"
-            >
-              <div>
-                <span className="text-sm font-bold text-slate-900 group-hover:text-blue-700 flex items-center gap-2">
-                  <span>→</span>
-                  <span>{t("taskCreateActionCard")}</span>
-                </span>
-                <p className="text-xs text-slate-500 mt-0.5 ml-4">
-                  {t("taskCreateActionCardDesc")}
-                </p>
-              </div>
-              <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-blue-600 transition-transform group-hover:translate-x-1" />
-            </button>
+              ))}
+            </div>
           </div>
-        </div>
+        </section>
+
+        <section aria-labelledby="preparedness-actions-heading">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <h2
+                id="preparedness-actions-heading"
+                className="text-sm font-bold text-slate-900"
+              >
+                {t("whatWouldYouLikeToDo")}
+              </h2>
+              <p className="mt-1 text-xs text-slate-500">
+                {language === "en"
+                  ? "Choose the workflow that matches the task you need to complete."
+                  : "Piliin ang workflow na naaayon sa gawaing kailangan mong tapusin."}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {preparednessActions.map((action) => (
+              <button
+                key={action.id}
+                type="button"
+                onClick={action.onClick}
+                className="group flex min-h-[330px] w-full flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-1 hover:border-blue-300 hover:bg-blue-50/35 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              >
+                <div className="relative h-40 w-full overflow-hidden rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-slate-50 sm:h-44">
+                  <Image
+                    src={action.image}
+                    alt=""
+                    fill
+                    sizes="(max-width: 767px) 100vw, (max-width: 1279px) 50vw, 25vw"
+                    className="object-contain p-4 transition-transform duration-300 group-hover:scale-[1.055]"
+                    aria-hidden="true"
+                  />
+                </div>
+
+                <div className="mt-4 flex min-h-0 flex-1 flex-col">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] text-blue-600">
+                    {action.category}
+                  </p>
+
+                  <h3 className="mt-1.5 text-base font-bold leading-snug text-slate-900 transition-colors group-hover:text-blue-700">
+                    {action.title}
+                  </h3>
+
+                  <p className="mt-2 text-xs leading-relaxed text-slate-500">
+                    {action.description}
+                  </p>
+
+                  <div className="mt-auto flex items-center justify-between gap-3 pt-5">
+                    <span className="text-xs font-bold text-blue-700 transition-colors group-hover:text-blue-800">
+                      {action.actionLabel}
+                    </span>
+
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-400 transition-all duration-200 group-hover:border-blue-200 group-hover:bg-blue-100 group-hover:text-blue-700">
+                      <ArrowRight
+                        className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5"
+                        aria-hidden="true"
+                      />
+                    </span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
       </div>
     );
   };
+
 
   // =========================================================================
   // VIEW 3: BARANGAY RISK ASSESSMENT PAGE
