@@ -93,7 +93,7 @@ describe("LGU Action Card sanitizer", () => {
   });
 
   it("drops a recommendation that does not have an approved action-rule id", () => {
-    const input = card();
+    const input: any = card();
     input.recommendedActions = [
       {
         action: "Evacuate immediately.",
@@ -111,7 +111,7 @@ describe("LGU Action Card sanitizer", () => {
   });
 
   it("drops a recommendation whose text was changed after rule matching", () => {
-    const input = card();
+    const input: any = card();
     input.recommendedActions[0].action = "Immediately evacuate all residents.";
 
     const result = sanitizeLGUActionCard(input, [rule]);
@@ -120,7 +120,7 @@ describe("LGU Action Card sanitizer", () => {
   });
 
   it("withholds population estimates when provenance metadata is incomplete", () => {
-    const input = card();
+    const input: any = card();
     input.potentialExposure.source = null;
 
     const result = sanitizeLGUActionCard(input, [rule]);
@@ -137,7 +137,7 @@ describe("LGU Action Card sanitizer", () => {
   });
 
   it("rejects a risk result that does not equal likelihood × severity", () => {
-    const input = card();
+    const input: any = card();
     input.whyAttentionIsNeeded.riskResult = 13;
     expect(() => sanitizeLGUActionCard(input, [rule])).toThrow(
       /deterministic risk result/,
@@ -145,7 +145,7 @@ describe("LGU Action Card sanitizer", () => {
   });
 
   it("rejects a risk category that disagrees with the documented methodology", () => {
-    const input = card();
+    const input: any = card();
     input.situation.riskCategory = "LOW";
     expect(() => sanitizeLGUActionCard(input, [rule])).toThrow(
       /risk category does not match/,
