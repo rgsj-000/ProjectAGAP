@@ -65,6 +65,27 @@ const formatFileSize = (bytes: number) => {
 const getFileExtension = (name: string) =>
   name.includes(".") ? name.split(".").pop()?.toLowerCase() ?? "" : "";
 
+const toDateTimeLocalValue = (value?: string) => {
+  const trimmed = value?.trim();
+
+  if (!trimmed || trimmed === "—") return "";
+
+  // Already in the exact browser format required by datetime-local.
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Also support ISO timestamps coming from the backend.
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return "";
+
+  const localTime = new Date(
+    parsed.getTime() - parsed.getTimezoneOffset() * 60_000
+  );
+
+  return localTime.toISOString().slice(0, 16);
+};
+
 export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
   initialValues,
   onCancel,
@@ -75,6 +96,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
   const [values, setValues] = useState<AdvisoryFormValues>({
     ...DEFAULT_VALUES,
     ...initialValues,
+    validity: toDateTimeLocalValue(initialValues?.validity),
     precautions:
       initialValues?.precautions && initialValues.precautions.length > 0
         ? initialValues.precautions
@@ -109,7 +131,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             bulletinLabel: "Bulletin / reference number",
             bulletinPlaceholder: "e.g. Bulletin #4",
             validityLabel: "Validity / effective period",
-            validityPlaceholder: "e.g. Valid until 2:00 PM, 9 Sep 2026",
+            validityPlaceholder: "Select date and time",
             affectedLocationsLabel: "Affected locations",
             affectedLocationsPlaceholder:
               "Enter only locations explicitly identified by the issuing source.",
@@ -164,7 +186,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             bulletinLabel: "Bulletin / reference number",
             bulletinPlaceholder: "hal. Bulletin #4",
             validityLabel: "Validity / panahon ng bisa",
-            validityPlaceholder: "hal. May bisa hanggang 2:00 PM, 9 Sep 2026",
+            validityPlaceholder: "Piliin ang petsa at oras",
             affectedLocationsLabel: "Mga apektadong lugar",
             affectedLocationsPlaceholder:
               "Ilagay lamang ang mga lugar na tahasang tinukoy ng ahensyang naglabas.",
@@ -575,11 +597,13 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             helpContent={getHelpContent("advisoryValidUntil", language)}
           >
             <input
+              type="datetime-local"
               value={values.validity}
               onChange={(event) => updateField("validity", event.target.value)}
-              placeholder={copy.validityPlaceholder}
+              step={60}
               className={inputClass(Boolean(errors.validity))}
               aria-invalid={Boolean(errors.validity)}
+              aria-label={copy.validityPlaceholder}
             />
           </Field>
 

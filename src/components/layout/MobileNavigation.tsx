@@ -12,6 +12,7 @@ export const MobileBottomNav: React.FC = () => {
     setCurrentModule,
     setPrepareSubView,
     isBarangayUser,
+    isFieldResponderUser,
   } = useNavigation();
   const { t } = useLanguage();
 
@@ -45,9 +46,13 @@ export const MobileBottomNav: React.FC = () => {
     },
   ];
 
-  const visibleNavItems = isBarangayUser
-    ? navItems.filter((item) => item.id !== "recovery")
-    : navItems;
+  const visibleNavItems = isFieldResponderUser
+    ? navItems.filter(
+        (item) => item.id === "home" || item.id === "report-damage"
+      )
+    : isBarangayUser
+      ? navItems.filter((item) => item.id !== "recovery")
+      : navItems;
 
   return (
     <nav
@@ -56,7 +61,11 @@ export const MobileBottomNav: React.FC = () => {
     >
       <div
         className={`grid h-16 max-w-md mx-auto items-center ${
-          isBarangayUser ? "grid-cols-3" : "grid-cols-4"
+          isFieldResponderUser
+            ? "grid-cols-2"
+            : isBarangayUser
+              ? "grid-cols-3"
+              : "grid-cols-4"
         }`}
       >
         {visibleNavItems.map((item) => {
