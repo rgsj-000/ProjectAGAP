@@ -38,11 +38,12 @@ The interface derives role and scope exclusively from the authenticated `user_pr
 
 The visible **Simulate User View** control and all public/field/barangay demo-role switching are removed from the judging experience. The profile area shows the real role and assigned barangay, when present. Navigation availability is derived from the returned role:
 
-- `field_reporter`: operations overview and Damage & Needs submission/synchronization.
-- `barangay_official`: barangay-scoped overview, preparedness workflows, and Damage & Needs for the assigned barangay.
-- `lgu_encoder`: intake and data-entry workflows allowed by the server.
+- `field_reporter`: assigned-barangay overview and Damage & Needs submission/synchronization.
+- `lgu_encoder`: intake and data-entry workflows allowed by the server, scoped to an assigned barangay when the profile contains one.
 - `lgu_reviewer`: validation, action-card generation, action assignment, post-impact consolidation, and audit review.
 - `admin`: the full authorized operational interface.
+
+The role vocabulary is the deployed schema vocabulary: `admin | lgu_reviewer | lgu_encoder | field_reporter`. `assigned_barangay_id` narrows the records and selectors shown to a user; it does not create an additional browser-only role.
 
 These client distinctions improve usability only. Every mutation remains protected by existing server authorization and Supabase RLS.
 
