@@ -1308,7 +1308,9 @@ function PreparednessBrief({ card: c }: { card: Row }) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error?.message ?? "AI briefing unavailable.");
       setAiBrief(result.data?.text ?? result.data?.content?.content ?? "");
-      if (result.data?.fallback) setAiError("Gemini wording is unavailable. This brief uses the persisted verified data and approved actions.");
+      if (result.data?.fallback) {
+        setAiError(result.data?.fallbackMessage ?? "Gemini wording is unavailable. This brief uses persisted verified data and approved actions.");
+      }
     } catch (error) {
       setAiError(error instanceof Error ? error.message : "AI briefing unavailable.");
     } finally {
