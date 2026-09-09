@@ -537,6 +537,20 @@ export function OperationalWorkspace() {
       )}
       {view === "home" && (
         <>
+          {!reviewer && pendingAdvisories.length > 0 && (
+            <Section title="Advisories awaiting verification">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-bold text-amber-950">
+                  {pendingAdvisories.length} advisory record(s) are waiting for an Admin or LGU Reviewer.
+                </p>
+                <p className="mt-1 text-sm leading-6 text-amber-900">
+                  Encoders can upload and correct advisory information, but they cannot mark an advisory as VERIFIED.
+                  This separation keeps source verification independent from data entry.
+                </p>
+              </div>
+            </Section>
+          )}
+
           {reviewer && (
             <Section title="Pending advisory verification">
               <p className="text-sm text-slate-600">
@@ -761,7 +775,7 @@ export function OperationalWorkspace() {
                 }
                 onClick={() => setShowAdvisory(!showAdvisory)}
               >
-                Enter advisory
+                Upload / enter advisory
               </Button>
               {reviewer && (
                 <button
@@ -773,7 +787,7 @@ export function OperationalWorkspace() {
                   }}
                   className="min-h-11 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-800"
                 >
-                  Review in verification queue
+                  Review & verify selected advisory
                 </button>
               )}
               <Button onClick={() => setCurrentModule("prepare")}>
@@ -798,12 +812,22 @@ export function OperationalWorkspace() {
                       throw new Error(result.error?.message ?? "Upload failed");
                     evidence = result.data;
                   }
-                  await saveAdvisory(values, evidence);
+                  const saved = await saveAdvisory(values, evidence) as Row;
                   await load();
                   setShowAdvisory(false);
-                  setMessage(
-                    "Advisory submitted for review. It will apply to resolved barangays only after an authorized reviewer verifies it.",
-                  );
+                  if (reviewer) {
+                    setReviewAdvisoryId(saved.id);
+                    setReviewEvidenceUrl("");
+                    setReviewReason("");
+                    setMessage(
+                      "Advisory submitted. Review the uploaded evidence and click Verify advisory to activate it.",
+                    );
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  } else {
+                    setMessage(
+                      "Advisory submitted as FOR REVIEW. An Admin or LGU Reviewer must verify it before it becomes active.",
+                    );
+                  }
                 }}
               />
             )}
