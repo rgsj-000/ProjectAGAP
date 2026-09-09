@@ -1,20 +1,42 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
+import dynamic from "next/dynamic";
 import { AppSidebar } from "./AppSidebar";
 import { AppHeader } from "./AppHeader";
 import { MobileBottomNav } from "./MobileNavigation";
 import { HelpDialog } from "./HelpDialog";
 import { AdvisoryModal } from "../advisory/AdvisoryModal";
-import { OperationalWorkspace } from "../modules/OperationalWorkspace";
 import { PublicHouseholdView } from "../public/PublicHouseholdView";
 import { useNavigation } from "@/context/NavigationContext";
+import { DemoLanding } from "@/components/demo/DemoLanding";
+
+const DemoWorkspace = dynamic(
+  () => import("@/components/demo/DemoWorkspace").then((module) => module.DemoWorkspace),
+  {
+    loading: () => (
+      <div className="space-y-4" role="status" aria-label="Opening the LGU demo">
+        <span className="sr-only">Opening LGU demo</span>
+        <div className="h-8 w-56 rounded bg-slate-200" />
+        <div className="h-32 rounded-xl bg-slate-200" />
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {[0, 1, 2, 3].map((item) => <div key={item} className="h-24 rounded-xl bg-slate-200" />)}
+        </div>
+      </div>
+    ),
+  },
+);
 
 export const AppShell: React.FC = () => {
   const { isPublicUser } = useNavigation();
+  const [demoOpen, setDemoOpen] = useState(false);
 
   if (isPublicUser) {
     return <PublicHouseholdView showDemoSwitcher />;
+  }
+
+  if (!demoOpen) {
+    return <DemoLanding onOpenDemo={() => setDemoOpen(true)} />;
   }
 
   return (
@@ -28,9 +50,9 @@ export const AppShell: React.FC = () => {
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 px-4 sm:px-8 lg:px-12 py-6 sm:py-8 max-w-4xl w-full mx-auto outline-hidden"
+          className="flex-1 w-full max-w-6xl mx-auto px-4 py-6 outline-hidden sm:px-8 sm:py-8 lg:px-10"
         >
-          <OperationalWorkspace />
+          <DemoWorkspace />
         </main>
       </div>
 

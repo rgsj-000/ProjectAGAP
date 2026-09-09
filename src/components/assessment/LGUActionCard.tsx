@@ -671,6 +671,44 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
             </div>
           </section>
 
+          <details className="agap-print-hide rounded-xl border border-blue-200 bg-blue-50/40">
+            <summary className="flex min-h-12 cursor-pointer items-center justify-between gap-3 px-4 py-3 text-sm font-bold text-blue-900 marker:content-none">
+              <span className="flex items-center gap-2">
+                <Database className="size-4" aria-hidden="true" />
+                View Evidence and Methodology
+              </span>
+              <span className="text-xs font-semibold text-blue-700">One-click trace</span>
+            </summary>
+            <div className="border-t border-blue-100 bg-white p-4 sm:p-5">
+              <dl className="grid gap-4 text-xs sm:grid-cols-2 lg:grid-cols-3">
+                <div><dt className="font-bold text-slate-500">Methodology and version</dt><dd className="mt-1 text-slate-800">{display(assessment?.methodology)}</dd></div>
+                <div><dt className="font-bold text-slate-500">Deterministic formula</dt><dd className="mt-1 font-mono text-slate-800">Likelihood × Severity = Risk</dd></div>
+                <div><dt className="font-bold text-slate-500">Calculation inputs</dt><dd className="mt-1 font-mono text-slate-800">{display(assessment?.likelihood)} × {display(assessment?.severity)} = {display(assessment?.riskResult)}</dd></div>
+                <div><dt className="font-bold text-slate-500">Assessment date</dt><dd className="mt-1 text-slate-800">{display(assessment?.assessmentDate)}</dd></div>
+                <div><dt className="font-bold text-slate-500">Population data source</dt><dd className="mt-1 text-slate-800">{display(exposure?.source)}</dd></div>
+                <div><dt className="font-bold text-slate-500">Data reference date</dt><dd className="mt-1 text-slate-800">{display(exposure?.referenceDate)}</dd></div>
+              </dl>
+              <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900">Evidence used</h3>
+                  <ul className="mt-2 space-y-2 text-xs leading-5 text-slate-700">
+                    {evidence.map((item, index) => <li key={`${item}-method-${index}`}>• {item}</li>)}
+                  </ul>
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900">Limitations and action-rule references</h3>
+                  <ul className="mt-2 space-y-2 text-xs leading-5 text-slate-700">
+                    {dataGaps.map((item, index) => <li key={`${item}-limit-${index}`}>• {item}</li>)}
+                    {recommendations.map((item) => <li key={`${item.id}-rule`}>• {display(item.sourceRule)}</li>)}
+                  </ul>
+                </div>
+              </div>
+              <p className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-700">
+                AI may explain, simplify, translate, classify, or personalize approved information. It did not calculate this risk score, verify the advisory, issue an evacuation order, select a route, or allocate resources.
+              </p>
+            </div>
+          </details>
+
           {/* Recommendations */}
           <section aria-labelledby="lgu-card-actions">
             <div className="mb-3 flex items-center gap-2">

@@ -10,7 +10,19 @@ import { cacheOfflinePack, readOfflinePack } from "@/lib/client/offlineQueue";
 import { generateHouseholdCard } from "@/lib/domain/actionCards";
 import { ConnectivityStatus } from "@/components/feedback/ConnectivityStatus";
 
-export function ConnectedHouseholdCard() {
+const demoBarangays = [
+  "Dalahican",
+  "Cotta",
+  "Gulang-Gulang",
+  "Ibabang Iyam",
+  "Mayao Kanluran",
+];
+
+export function ConnectedHouseholdCard({
+  demoMode = false,
+}: {
+  demoMode?: boolean;
+}) {
   const { language } = useLanguage();
   const [barangays, setBarangays] = useState<string[]>([]);
   const [output, setOutput] = useState<HouseholdCardOutput | null>(null);
@@ -26,6 +38,13 @@ export function ConnectedHouseholdCard() {
     update();
     window.addEventListener("online", update);
     window.addEventListener("offline", update);
+    if (demoMode) {
+      setBarangays(demoBarangays);
+      return () => {
+        window.removeEventListener("online", update);
+        window.removeEventListener("offline", update);
+      };
+    }
     void (async () => {
       try {
         const names = await api<string[]>("/api/public/preparedness");
@@ -46,7 +65,7 @@ export function ConnectedHouseholdCard() {
       window.removeEventListener("online", update);
       window.removeEventListener("offline", update);
     };
-  }, []);
+  }, [demoMode]);
   async function generate(request: Record<string, unknown>) {
     setBusy(true);
     setError("");
@@ -56,7 +75,72 @@ export function ConnectedHouseholdCard() {
       const code = String(request.householdCode ?? "")
         .trim()
         .toUpperCase();
-      if (navigator.onLine) {
+      if (demoMode) {
+        const barangay = String(
+          request.barangay || (code.startsWith("DLH") ? "Dalahican" : "Dalahican"),
+        );
+        const tailoredActions: HouseholdCardOutput["actions"] = [
+          {
+            id: "HH-PREP-001",
+            title: "Prepare essential supplies for at least three days",
+            explanation:
+              "Include safe water, ready-to-eat food, flashlights, batteries, a first-aid kit, and copies of important documents.",
+            sourceRule:
+              "HH-PREP-001 · AGAP Approved Household Rule Library v1.1",
+          },
+          ...(request.hasEssentialMedicineNeed
+            ? [
+                {
+                  id: "HH-MED-002",
+                  title: "Prepare essential medicines and prescriptions",
+                  explanation:
+                    "Keep medicines dry and easy to carry. Confirm refill or storage needs with the barangay or health center.",
+                  sourceRule:
+                    "HH-MED-002 · AGAP Approved Household Rule Library v1.1",
+                },
+              ]
+            : []),
+          ...(request.hasPwdOrMobilityLimitation || request.hasOlderPerson
+            ? [
+                {
+                  id: "HH-ASSIST-004",
+                  title: "Confirm household assistance needs",
+                  explanation:
+                    "Identify a support person and confirm accessible assistance arrangements with the barangay before conditions worsen.",
+                  sourceRule:
+                    "HH-ASSIST-004 · AGAP Approved Household Rule Library v1.1",
+                },
+              ]
+            : []),
+          {
+            id: "HH-COM-003",
+            title: "Monitor official PAGASA and Lucena City updates",
+            explanation:
+              "Use the communication channels available to your household and confirm any evacuation instruction directly with the LGU or barangay.",
+            sourceRule:
+              "HH-COM-003 · AGAP Approved Household Rule Library v1.1",
+          },
+        ];
+        card = {
+          barangay,
+          householdCode: code || null,
+          advisoryTitle:
+            "Typhoon · heavy rainfall and strong winds (synthetic demo)",
+          advisoryReference:
+            "Tropical Cyclone Bulletin No. 08 (Synthetic)",
+          advisoryValidity: "2026-09-10T20:00:00+08:00",
+          advisoryVerificationState: "VERIFIED",
+          generatedAt: new Date().toISOString(),
+          lastSyncAt: "2026-09-09T08:30:00+08:00",
+          languageLabel: language === "en" ? "English" : "Filipino",
+          actions: tailoredActions,
+          limitations: [
+            "Synthetic demonstration information only; not an official public warning.",
+            "This card does not declare the household safe or issue an evacuation order.",
+            "Confirm current conditions, routes, shelters, and instructions with the barangay or LGU.",
+          ],
+        };
+      } else if (navigator.onLine) {
         card = await api<HouseholdCardOutput>("/api/households/action-card", {
           method: "POST",
           body: JSON.stringify({
