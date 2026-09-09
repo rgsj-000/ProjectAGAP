@@ -1,5 +1,5 @@
 import { advisoryInput } from "@/lib/server/validation";
-import { AppError, fail, ok } from "@/lib/server/errors";
+import { fail, ok } from "@/lib/server/errors";
 import { requireLguUser } from "@/lib/server/auth";
 import { audit } from "@/lib/server/audit";
 import { resolveAdvisoryApplicability } from "@/lib/domain/advisoryCoverage";
@@ -8,15 +8,22 @@ export async function GET(request: Request) {
   try {
     const { supabase } = await requireLguUser();
     const url = new URL(request.url);
-    let q = supabase.from("advisories").select("*").order("issue_time", { ascending: false });
+    let q = supabase
+      .from("advisories")
+      .select("*")
+      .order("issue_time", { ascending: false });
+
     if (url.searchParams.get("active") === "true") {
+      const now = new Date().toISOString();
       q = q
         .eq("verification_status", "VERIFIED")
-        .lte("validity_start", new Date().toISOString())
-        .gt("validity_end", new Date().toISOString());
+        .lte("validity_start", now)
+        .gt("validity_end", now);
     }
+
     const barangay = url.searchParams.get("barangay");
     if (barangay) q = q.contains("affected_areas", [barangay]);
+
     const { data, error } = await q;
     if (error) throw error;
     return ok(data);
@@ -59,16 +66,19 @@ export async function POST(request: Request) {
       },
     };
 
+    const sourceAgency = v.sourceAgency.trim();
     const bulletinReference = v.bulletinReference.trim();
+
     const { data: existing, error: existingError } = await supabase
       .from("advisories")
       .select("*")
+      .eq("source_agency", sourceAgency)
       .eq("bulletin_reference", bulletinReference)
       .maybeSingle();
     if (existingError) throw existingError;
 
     const record = {
-      source_agency: v.sourceAgency,
+      source_agency: sourceAgency,
       advisory_type: v.advisoryType,
       bulletin_reference: bulletinReference,
       warning_information: v.warningInformation,
@@ -81,53 +91,35 @@ export async function POST(request: Request) {
       verified_by: null,
       verified_at: null,
       raw_content: rawContent,
+      created_by: existing?.created_by ?? user.id,
     };
 
-    if (existing) {
-      const existingSource = String(existing.source_agency ?? "").trim().toLowerCase();
-      if (existingSource && existingSource !== v.sourceAgency.trim().toLowerCase()) {
-        throw new AppError(
-          "INVALID_INPUT",
-          `Bulletin/reference "${bulletinReference}" already exists under another issuing source.`,
-          409,
-        );
-      }
-
-      const { data, error } = await supabase
-        .from("advisories")
-        .update(record)
-        .eq("id", existing.id)
-        .select()
-        .single();
-      if (error) throw error;
-
-      await audit(supabase, {
-        userId: user.id,
-        action: "MODIFICATION",
-        entityType: "advisory",
-        entityId: existing.id,
-        oldValue: existing,
-        newValue: data,
-      });
-      return ok(data);
-    }
-
+    /*
+     * source_agency + bulletin_reference is the database identity for an
+     * advisory. Upsert makes repeated extraction/submission idempotent and
+     * also closes the race where two requests pass a read-before-insert check.
+     */
     const { data, error } = await supabase
       .from("advisories")
-      .insert({ ...record, created_by: user.id })
+      .upsert(record, {
+        onConflict: "source_agency,bulletin_reference",
+        ignoreDuplicates: false,
+      })
       .select()
       .single();
+
     if (error) throw error;
 
     await audit(supabase, {
       userId: user.id,
-      action: "CREATE",
+      action: existing ? "MODIFICATION" : "CREATE",
       entityType: "advisory",
       entityId: data.id,
+      oldValue: existing ?? undefined,
       newValue: data,
     });
 
-    return ok(data, 201);
+    return ok(data, existing ? 200 : 201);
   } catch (e) {
     return fail(e);
   }
