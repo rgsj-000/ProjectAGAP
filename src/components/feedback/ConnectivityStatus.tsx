@@ -10,6 +10,8 @@ import {
   RotateCw,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import HelpTooltip from "@/components/ui/HelpTooltip";
+import { getHelpContent } from "@/lib/help-content";
 
 export type ConnectivityState =
   | "ONLINE"
@@ -111,8 +113,8 @@ export const ConnectivityStatus: React.FC<ConnectivityStatusProps> = ({
 
   const descriptions: Record<ConnectivityState, { en: string; fil: string }> = {
     ONLINE: {
-      en: "Connected. Current synchronized data may be available.",
-      fil: "May koneksyon. Maaaring available ang kasalukuyang synchronized data.",
+      en: "Connected to the internet. Check the last data sync and advisory validity before relying on operational information.",
+      fil: "May internet connection. Tingnan ang huling data sync at validity ng advisory bago gamitin ang impormasyon para sa operational decisions.",
     },
     OFFLINE: {
       en: "No usable internet connection. Use only previously synchronized data and clearly marked cached records.",
@@ -145,6 +147,10 @@ export const ConnectivityStatus: React.FC<ConnectivityStatusProps> = ({
       >
         {meta.icon}
         <span className="text-xs font-bold text-slate-800">{label}</span>
+        <HelpTooltip
+          content={getHelpContent("onlineStatus", language)}
+          align="right"
+        />
 
         {lastSyncAt ? (
           <>
@@ -167,7 +173,7 @@ export const ConnectivityStatus: React.FC<ConnectivityStatusProps> = ({
   return (
     <section
       className={`rounded-2xl border p-4 sm:p-5 ${meta.container} ${className}`}
-      aria-label={language === "en" ? "Connectivity status" : "Kalagayan ng koneksyon"}
+      aria-label={language === "en" ? "Connection and data freshness status" : "Kalagayan ng koneksyon at pagiging bago ng data"}
       role="status"
       aria-live="polite"
     >
@@ -181,6 +187,11 @@ export const ConnectivityStatus: React.FC<ConnectivityStatusProps> = ({
             >
               {label}
             </span>
+
+            <HelpTooltip
+              content={getHelpContent("onlineStatus", language)}
+              align="left"
+            />
 
             {pendingSyncCount > 0 ? (
               <span className="rounded-full border border-blue-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-700">
@@ -222,27 +233,41 @@ export const ConnectivityStatus: React.FC<ConnectivityStatusProps> = ({
 
       <dl className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="rounded-xl border border-white/80 bg-white/70 p-3">
-          <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            {language === "en" ? "Connectivity" : "Koneksyon"}
+          <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <span>{language === "en" ? "Internet Connection" : "Koneksyon sa Internet"}</span>
+            <HelpTooltip
+              content={getHelpContent("onlineStatus", language)}
+              align="left"
+            />
           </dt>
           <dd className="mt-1 text-xs font-semibold text-slate-800">{label}</dd>
         </div>
 
         <div className="rounded-xl border border-white/80 bg-white/70 p-3">
-          <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            {language === "en" ? "Last Synchronization" : "Huling Synchronization"}
+          <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <span>{language === "en" ? "Last Data Sync" : "Huling Data Sync"}</span>
+            <HelpTooltip
+              content={getHelpContent("lastDataSync", language)}
+              align="center"
+            />
           </dt>
           <dd className="mt-1 text-xs font-semibold text-slate-800">
-            {lastSyncAt ?? "—"}
+            {lastSyncAt ?? (language === "en" ? "Not available" : "Hindi available")}
           </dd>
         </div>
 
         <div className="rounded-xl border border-white/80 bg-white/70 p-3">
-          <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            {language === "en" ? "Advisory Validity" : "Validity ng Advisory"}
+          <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <span>
+              {language === "en" ? "Advisory Valid Until" : "Balido ang Advisory Hanggang"}
+            </span>
+            <HelpTooltip
+              content={getHelpContent("advisoryValidUntil", language)}
+              align="right"
+            />
           </dt>
           <dd className="mt-1 text-xs font-semibold text-slate-800">
-            {advisoryValidity ?? "—"}
+            {advisoryValidity ?? (language === "en" ? "Not available" : "Hindi available")}
           </dd>
         </div>
       </dl>
@@ -251,8 +276,8 @@ export const ConnectivityStatus: React.FC<ConnectivityStatusProps> = ({
         <Cloud className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         <span>
           {language === "en"
-            ? "Browser connectivity can be detected by the frontend, but authoritative synchronization state, freshness limits, conflict state, and successful uploads must come from the synchronization/backend layer."
-            : "Kayang makita ng frontend ang browser connectivity, ngunit ang authoritative synchronization state, freshness limits, conflict state, at successful uploads ay dapat manggaling sa synchronization/backend layer."}
+            ? "Internet connection alone does not guarantee that the displayed information is current. Check the last data sync and advisory validity before using the information for operational decisions."
+            : "Ang internet connection lamang ay hindi garantiya na kasalukuyan ang ipinapakitang impormasyon. Tingnan ang huling data sync at validity ng advisory bago ito gamitin sa operational decisions."}
         </span>
       </p>
     </section>

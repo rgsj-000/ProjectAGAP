@@ -33,34 +33,34 @@ const translations: Record<string, { en: string; fil: string }> = {
   // Home Screen
   homeGreeting: { en: "Magandang araw.", fil: "Magandang araw." },
   homeSubtitle: {
-    en: "Supporting Lucena preparedness, response, and post-impact review using verified disaster information.",
-    fil: "Sinusuportahan ang paghahanda, pagtugon, at post-impact review ng Lucena gamit ang beripikadong disaster information.",
+    en: "Supporting Lucena disaster preparedness, response, and post-impact review using verified and clearly identified information.",
+    fil: "Sinusuportahan ang disaster preparedness, response, at post-impact review ng Lucena gamit ang verified at malinaw na identified information.",
   },
-  currentAdvisoryLabel: { en: "ADVISORY STATUS", fil: "STATUS NG ADVISORY" },
-  advisoryActive: { en: "ADVISORY RECORD", fil: "ADVISORY RECORD" },
-  viewAdvisory: { en: "View Advisory", fil: "Tingnan ang Babala" },
+  currentAdvisoryLabel: { en: "ADVISORY INFORMATION", fil: "IMPORMASYON NG ADVISORY" },
+  advisoryActive: { en: "ADVISORY STATUS", fil: "STATUS NG ADVISORY" },
+  viewAdvisory: { en: "View Advisory", fil: "Tingnan ang Advisory" },
   whatDoYouNeedToDo: { en: "WHAT DO YOU NEED TO DO?", fil: "ANO ANG KAILANGAN MONG GAWIN?" },
 
-  actionPrepareTitle: { en: "1. PREPARE", fil: "1. PAGHAHANDA" },
+  actionPrepareTitle: { en: "1. PREPAREDNESS", fil: "1. PAGHAHANDA" },
   actionPrepareDesc: {
-    en: "See which barangays may need attention and prepare appropriate actions.",
-    fil: "Tingnan kung aling mga barangay ang nangangailangan ng atensyon at ihanda ang mga kaukulang hakbang.",
+    en: "Review barangay risk, exposure, preparedness capacity, evidence, and actions that may need LGU attention.",
+    fil: "Suriin ang barangay risk, exposure, preparedness capacity, evidence, at mga aksyong maaaring mangailangan ng LGU attention.",
   },
-  actionPrepareBtn: { en: "Start Preparing", fil: "Magsimula sa Paghahanda" },
+  actionPrepareBtn: { en: "Open Preparedness", fil: "Buksan ang Paghahanda" },
 
   actionReportTitle: { en: "2. DAMAGE & NEEDS", fil: "2. PINSALA AT PANGANGAILANGAN" },
   actionReportDesc: {
-    en: "Record reported damage, urgent needs, evidence, and verification state.",
-    fil: "Itala ang reported na pinsala, agarang pangangailangan, ebidensya, at verification state.",
+    en: "Record reported damage, affected population, critical-facility status, access conditions, priority needs, evidence, and verification status.",
+    fil: "Itala ang reported damage, affected population, critical-facility status, access conditions, priority needs, evidence, at verification status.",
   },
   actionReportBtn: { en: "Open Report", fil: "Buksan ang Ulat" },
 
   actionRecoveryTitle: { en: "3. POST IMPACT", fil: "3. POST IMPACT" },
   actionRecoveryDesc: {
-    en: "Review reported versus validated impacts, unmet needs, and source-anchored LGU actions.",
-    fil: "Suriin ang reported versus validated impacts, unmet needs, at source-anchored LGU actions.",
+    en: "Review reported versus validated impacts, information pending validation, priority needs, and source-based LGU actions.",
+    fil: "Suriin ang reported versus validated impacts, information pending validation, priority needs, at source-based LGU actions.",
   },
-  actionRecoveryBtn: { en: "View Post Impact", fil: "Tingnan ang Post Impact" },
+  actionRecoveryBtn: { en: "Open Post Impact", fil: "Buksan ang Post Impact" },
 
   needHelp: { en: "Need Help?", fil: "Kailangan ng Tulong?" },
   contactLguHotlines: {
@@ -69,10 +69,10 @@ const translations: Record<string, { en: string; fil: string }> = {
   },
 
   // Prepare Screen
-  prepareTitle: { en: "PREPARE", fil: "PAGHAHANDA" },
+  prepareTitle: { en: "PREPAREDNESS", fil: "PAGHAHANDA" },
   currentOfficialAdvisory: {
-    en: "Current advisory record:",
-    fil: "Kasalukuyang advisory record:",
+    en: "Current advisory information:",
+    fil: "Kasalukuyang impormasyon ng advisory:",
   },
   whatWouldYouLikeToDo: {
     en: "What would you like to do?",
@@ -83,42 +83,42 @@ const translations: Record<string, { en: string; fil: string }> = {
     fil: "Suriin ang Barangay Assessments",
   },
   taskSeePrioritiesDesc: {
-    en: "Review risk categories, supporting evidence, and data gaps",
-    fil: "Suriin ang risk categories, supporting evidence, at data gaps",
+    en: "Review DRRM risk results, supporting evidence, and information gaps",
+    fil: "Suriin ang DRRM risk results, supporting evidence, at information gaps",
   },
   taskViewBarangayInfo: {
     en: "View Barangay Information",
     fil: "Tingnan ang Impormasyon ng Barangay",
   },
   taskViewBarangayInfoDesc: {
-    en: "Review available baseline demographics, facilities, and data gaps",
-    fil: "Suriin ang available na baseline demographics, facilities, at data gaps",
+    en: "Review available population, vulnerable groups, critical facilities, preparedness capacity, and information gaps",
+    fil: "Suriin ang available population, vulnerable groups, critical facilities, preparedness capacity, at information gaps",
   },
   taskCreateBrief: {
     en: "Create Preparedness Brief",
     fil: "Gumawa ng Buod ng Paghahanda",
   },
   taskCreateBriefDesc: {
-    en: "Prepare a source-anchored responder brief from verified data",
-    fil: "Maghanda ng source-anchored responder brief mula sa beripikadong data",
+    en: "Prepare a responder brief using verified advisory information and approved action rules",
+    fil: "Maghanda ng responder brief gamit ang verified advisory information at approved action rules",
   },
   taskCreateActionCard: {
     en: "Create Household Action Card",
-    fil: "Gumawa ng Gabay sa Tahanan",
+    fil: "Gumawa ng Household Action Card",
   },
   taskCreateActionCardDesc: {
-    en: "Use household code, quick profile, or barangay-only preparedness mode",
-    fil: "Gamitin ang household code, quick profile, o barangay-only preparedness mode",
+    en: "Use Household Code, Quick Household Profile, or General Barangay Preparedness Card",
+    fil: "Gamitin ang Household Code, Quick Household Profile, o Pangkalahatang Barangay Preparedness Card",
   },
 
   // Priority Barangays
   barangaysNeedingAttention: {
-    en: "Barangays Needing Attention",
-    fil: "Mga Barangay na Nangangailangan ng Atensyon",
+    en: "Barangays Requiring Review",
+    fil: "Mga Barangay na Kailangang Suriin",
   },
   basedOnVerifiedAdvisory: {
-    en: "Uses verified advisory and assessment data when available.",
-    fil: "Gumagamit ng verified advisory at assessment data kapag available.",
+    en: "Uses verified advisory and assessment information when available; missing or unverified information remains identified.",
+    fil: "Gumagamit ng verified advisory at assessment information kapag available; malinaw na minamarkahan ang kulang o unverified information.",
   },
   topPriorityBarangays: {
     en: "Barangays for Review",
@@ -132,18 +132,18 @@ const translations: Record<string, { en: string; fil: string }> = {
     en: "Show Top Only",
     fil: "Ipakita Lamang ang Nangunguna",
   },
-  why: { en: "Why?", fil: "Bakit?" },
-  backToPrepare: { en: "Back to Prepare", fil: "Bumalik sa Paghahanda" },
+  why: { en: "Why this needs review", fil: "Bakit kailangang suriin" },
+  backToPrepare: { en: "Back to Preparedness", fil: "Bumalik sa Paghahanda" },
 
   // Barangay Detail
   whyDoesBarangayNeedAttention: {
-    en: "Why does this barangay need attention?",
-    fil: "Bakit kailangan ng atensyon ng barangay na ito?",
+    en: "Why does this barangay need LGU review?",
+    fil: "Bakit kailangang suriin ng LGU ang barangay na ito?",
   },
-  hazardExposure: { en: "Hazard Exposure", fil: "Banta ng Panganib" },
-  vulnerablePopulation: { en: "Vulnerable Population", fil: "Bulnerableng Sektor" },
-  criticalFacilities: { en: "Critical Facilities", fil: "Mahalagang Pasilidad" },
-  preparednessGap: { en: "Preparedness Gap", fil: "Kulang sa Kahandaan" },
+  hazardExposure: { en: "Hazard Exposure", fil: "Pagkakalantad sa Hazard" },
+  vulnerablePopulation: { en: "Vulnerable Groups", fil: "Vulnerable Groups" },
+  criticalFacilities: { en: "Critical Facilities", fil: "Critical Facilities" },
+  preparednessGap: { en: "Preparedness Capacity Gap", fil: "Kakulangan sa Preparedness Capacity" },
   viewFullScore: {
     en: "View Assessment Explanation",
     fil: "Tingnan ang Paliwanag ng Assessment",
@@ -162,19 +162,19 @@ const translations: Record<string, { en: string; fil: string }> = {
   back: { en: "Back", fil: "Bumalik" },
   submitReport: { en: "Save Report", fil: "I-save ang Ulat" },
   reportSubmittedSuccess: {
-    en: "Report saved locally as Pending Sync. It remains unverified.",
-    fil: "Na-save locally ang ulat bilang Pending Sync. Nananatili itong unverified.",
+    en: "Report saved as Pending Sync. It remains unverified until synchronization and authorized review are completed.",
+    fil: "Na-save ang report bilang Pending Sync. Nananatili itong unverified hanggang matapos ang synchronization at authorized review.",
   },
 
   // Post Impact
   recoveryTitle: { en: "Post Impact Action Card", fil: "Post Impact Action Card" },
   recoverySubtitle: {
-    en: "Review reported and validated impacts, data gaps, and source-anchored LGU actions.",
-    fil: "Suriin ang reported at validated impacts, data gaps, at source-anchored LGU actions.",
+    en: "Review reported and validated impacts, information pending validation, priority needs, and source-based LGU actions.",
+    fil: "Suriin ang reported at validated impacts, information pending validation, priority needs, at source-based LGU actions.",
   },
-  mainReason: { en: "Why it needs review:", fil: "Bakit kailangan ng review:" },
+  mainReason: { en: "Why LGU review is needed:", fil: "Bakit kailangan ng LGU review:" },
   viewDetails: { en: "View Details", fil: "Tingnan ang Detalye" },
-  howCalculated: { en: "How was this assessed?", fil: "Paano ito in-assess?" },
+  howCalculated: { en: "How was this reviewed?", fil: "Paano ito sinuri?" },
 
   // Deterministic Risk Categories
   priorityVeryHigh: { en: "VERY HIGH RISK", fil: "NAPAKATAAS NA PANGANIB" },

@@ -13,6 +13,8 @@ import {
   Users,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import HelpTooltip from "@/components/ui/HelpTooltip";
+import { getHelpContent, type HelpContentDefinition } from "@/lib/help-content";
 
 export type LGUVerificationState =
   | "UNVERIFIED"
@@ -150,14 +152,25 @@ function StateBadge({
 function Field({
   label,
   value,
+  helpContent,
+  helpAlign = "left",
 }: {
   label: string;
   value: string | number | null | undefined;
+  helpContent?: HelpContentDefinition;
+  helpAlign?: "left" | "center" | "right";
 }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
-      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-        {label}
+      <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        <span>{label}</span>
+        {helpContent ? (
+          <HelpTooltip
+            content={helpContent}
+            align={helpAlign}
+            className="agap-print-hide"
+          />
+        ) : null}
       </span>
       <span className="mt-1 block text-sm font-semibold text-slate-900">
         {display(value)}
@@ -251,7 +264,7 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
 
   const controls = [
     {
-      label: language === "en" ? "Validate" : "I-validate",
+      label: language === "en" ? "Validate Assessment" : "I-validate ang Assessment",
       onClick: onValidate,
     },
     {
@@ -263,7 +276,7 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
       onClick: onRequestUpdate,
     },
     {
-      label: language === "en" ? "Generate Brief" : "Gumawa ng Buod",
+      label: language === "en" ? "Generate Preparedness Brief" : "Gumawa ng Preparedness Brief",
       onClick: onGenerateBrief,
     },
     {
@@ -320,21 +333,31 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
 
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Field
-              label={language === "en" ? "Current Advisory" : "Kasalukuyang Babala"}
+              label={language === "en" ? "Current Advisory" : "Kasalukuyang Advisory"}
               value={advisory?.title}
+              helpContent={getHelpContent("currentAdvisory", language)}
             />
             <Field
               label={language === "en" ? "Risk Result" : "Resulta ng Panganib"}
               value={assessment?.riskResult}
+              helpContent={getHelpContent("riskResult", language)}
+              helpAlign="center"
             />
             <Field
               label={language === "en" ? "Assessment Date" : "Petsa ng Pagtatasa"}
               value={assessment?.assessmentDate}
             />
             <div className="rounded-xl border border-slate-200 bg-white p-3.5">
-              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                {language === "en" ? "Verification" : "Beripikasyon"}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {language === "en" ? "Verification Status" : "Verification Status"}
+                </span>
+                <HelpTooltip
+                  content={getHelpContent("assessmentVerificationStatus", language)}
+                  align="right"
+                  className="agap-print-hide"
+                />
+              </div>
               <div className="mt-1.5">
                 <StateBadge
                   state={assessment?.verificationState ?? "UNVERIFIED"}
@@ -351,7 +374,7 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
             <div className="mb-3 flex items-center gap-2">
               <Radio className="h-4 w-4 text-blue-600" aria-hidden="true" />
               <h2 id="lgu-card-advisory" className="text-sm font-bold text-slate-900">
-                {language === "en" ? "Verified Advisory" : "Beripikadong Babala"}
+                {language === "en" ? "Official Advisory Information" : "Impormasyon ng Opisyal na Advisory"}
               </h2>
             </div>
 
@@ -365,13 +388,21 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
                 value={advisory?.issuedAt}
               />
               <Field
-                label={language === "en" ? "Validity" : "Bisa"}
+                label={language === "en" ? "Advisory Valid Until" : "Balido ang Advisory Hanggang"}
                 value={advisory?.validity}
+                helpContent={getHelpContent("advisoryValidUntil", language)}
               />
               <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
-                <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {language === "en" ? "Advisory Status" : "Katayuan ng Babala"}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {language === "en" ? "Advisory Status" : "Advisory Status"}
+                  </span>
+                  <HelpTooltip
+                    content={getHelpContent("advisoryVerificationStatus", language)}
+                    align="right"
+                    className="agap-print-hide"
+                  />
+                </div>
                 <div className="mt-1.5">
                   <StateBadge
                     state={advisory?.verificationState ?? "UNVERIFIED"}
@@ -388,38 +419,57 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
               <ShieldCheck className="h-4 w-4 text-blue-600" aria-hidden="true" />
               <h2 id="lgu-card-assessment" className="text-sm font-bold text-slate-900">
                 {language === "en"
-                  ? "Deterministic Risk Assessment"
-                  : "Deterministikong Pagtatasa ng Panganib"}
+                  ? "DRRM Risk Assessment"
+                  : "DRRM Risk Assessment"}
               </h2>
             </div>
 
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
               <Field
-                label={language === "en" ? "Likelihood" : "Posibilidad"}
+                label={
+                  language === "en"
+                    ? "Likelihood of Occurrence"
+                    : "Likelihood of Occurrence"
+                }
                 value={assessment?.likelihood}
+                helpContent={getHelpContent("likelihood", language)}
               />
               <Field
-                label={language === "en" ? "Severity" : "Tindi"}
+                label={
+                  language === "en"
+                    ? "Severity of Consequence"
+                    : "Severity of Consequence"
+                }
                 value={assessment?.severity}
+                helpContent={getHelpContent("severity", language)}
               />
               <Field
-                label={language === "en" ? "Risk Result" : "Resulta"}
+                label={language === "en" ? "Risk Result" : "Resulta ng Panganib"}
                 value={assessment?.riskResult}
+                helpContent={getHelpContent("riskResult", language)}
+                helpAlign="center"
               />
               <Field
                 label={
                   language === "en"
                     ? "Relative Vulnerability"
-                    : "Relatibong Vulnerability"
+                    : "Relative Vulnerability"
                 }
                 value={assessment?.relativeVulnerability}
+                helpContent={getHelpContent("relativeVulnerability", language)}
+                helpAlign="right"
               />
             </div>
 
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Field
-                label={language === "en" ? "Methodology" : "Metodolohiya"}
+                label={
+                  language === "en"
+                    ? "Assessment Methodology"
+                    : "Assessment Methodology"
+                }
                 value={assessment?.methodology}
+                helpContent={getHelpContent("methodology", language)}
               />
               <Field
                 label={language === "en" ? "Assessment Date" : "Petsa ng Pagtatasa"}
@@ -429,8 +479,8 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
 
             <p className="mt-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-xs leading-relaxed text-blue-900">
               {language === "en"
-                ? "Risk results are supplied by the documented deterministic methodology. This interface does not calculate or alter the assessment."
-                : "Ang resulta ng panganib ay nagmumula sa dokumentadong deterministikong metodolohiya. Hindi kinakalkula o binabago ng interface na ito ang assessment."}
+                ? "Risk follows the documented DRRM method and verified inputs. AI may explain the result but cannot change the calculation."
+                : "Ang risk ay sumusunod sa documented DRRM method at verified inputs. Maaaring ipaliwanag ng AI ang result ngunit hindi nito mababago ang calculation."}
             </p>
           </section>
 
@@ -440,9 +490,14 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
               <Users className="h-4 w-4 text-blue-600" aria-hidden="true" />
               <h2 id="lgu-card-exposure" className="text-sm font-bold text-slate-900">
                 {language === "en"
-                  ? "Potential Population Exposure"
-                  : "Tinatayang Population Exposure"}
+                  ? "Estimated Potentially Exposed Population"
+                  : "Tinatayang Populasyong Posibleng Malantad"}
               </h2>
+              <HelpTooltip
+                content={getHelpContent("potentiallyExposedPopulation", language)}
+                align="left"
+                className="agap-print-hide"
+              />
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -453,14 +508,19 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
                     : "Tinatayang Posibleng Malantad na Tao"
                 }
                 value={exposure?.estimatedPersons}
+                helpContent={getHelpContent("potentiallyExposedPopulation", language)}
               />
               <Field
-                label={language === "en" ? "Estimated Households" : "Tinatayang Sambahayan"}
+                label={language === "en" ? "Estimated Exposed Households" : "Tinatayang Exposed Households"}
                 value={exposure?.estimatedHouseholds}
+                helpContent={getHelpContent("estimatedExposedHouseholds", language)}
+                helpAlign="center"
               />
               <Field
-                label={language === "en" ? "Vulnerable Groups" : "Bulnerableng Grupo"}
+                label={language === "en" ? "Estimated Vulnerable Groups" : "Tinatayang Vulnerable Groups"}
                 value={exposure?.vulnerableGroups}
+                helpContent={getHelpContent("estimatedVulnerableGroups", language)}
+                helpAlign="right"
               />
             </div>
 
@@ -468,17 +528,20 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
               <Field
                 label={language === "en" ? "Estimation Method" : "Paraan ng Pagtatantiya"}
                 value={exposure?.estimationMethod}
+                helpContent={getHelpContent("exposureEstimationMethod", language)}
               />
               <Field
-                label={language === "en" ? "Confidence" : "Confidence"}
+                label={language === "en" ? "Confidence Level" : "Confidence Level"}
                 value={exposure?.confidenceLevel}
+                helpContent={getHelpContent("confidenceLevel", language)}
+                helpAlign="center"
               />
               <Field
                 label={language === "en" ? "Source" : "Pinagmulan"}
                 value={exposure?.source}
               />
               <Field
-                label={language === "en" ? "Reference Date" : "Reference Date"}
+                label={language === "en" ? "Data Reference Date" : "Petsa ng Reference Data"}
                 value={exposure?.referenceDate}
               />
             </div>
@@ -491,24 +554,44 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
               <h2 id="lgu-card-capacity" className="text-sm font-bold text-slate-900">
                 {language === "en" ? "Preparedness Capacity" : "Kapasidad sa Paghahanda"}
               </h2>
+              <HelpTooltip
+                content={getHelpContent("preparednessCapacity", language)}
+                align="left"
+                className="agap-print-hide"
+              />
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <Field
-                label={language === "en" ? "Recorded Validated Capacity" : "Naitalang Kapasidad"}
+                label={
+                  language === "en"
+                    ? "Validated Evacuation / Temporary-Shelter Capacity"
+                    : "Validated Evacuation / Temporary-Shelter Capacity"
+                }
                 value={capacity?.recordedCapacity}
+                helpContent={getHelpContent("validatedShelterCapacity", language)}
               />
               <Field
                 label={language === "en" ? "Potential Capacity Gap" : "Posibleng Capacity Gap"}
                 value={capacity?.potentialCapacityGap}
+                helpContent={getHelpContent("potentialCapacityGap", language)}
+                helpAlign="center"
               />
               <Field
-                label={language === "en" ? "Critical-Facility Readiness" : "Kahandaan ng Pasilidad"}
+                label={
+                  language === "en"
+                    ? "Critical Facilities Readiness"
+                    : "Kahandaan ng Critical Facilities"
+                }
                 value={capacity?.criticalFacilityReadiness}
+                helpContent={getHelpContent("criticalFacilities", language)}
+                helpAlign="right"
               />
               <Field
-                label={language === "en" ? "Communication Capability" : "Kakayahang Komunikasyon"}
+                label={language === "en" ? "Communication Capability" : "Communication Capability"}
                 value={capacity?.communicationCapability}
+                helpContent={getHelpContent("communicationCapability", language)}
+                helpAlign="right"
               />
             </div>
           </section>
@@ -524,9 +607,16 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
 
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
               <div className="rounded-xl border border-slate-200 p-4">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {language === "en" ? "Evidence" : "Ebidensya"}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {language === "en" ? "Assessment Evidence" : "Assessment Evidence"}
+                  </span>
+                  <HelpTooltip
+                    content={getHelpContent("assessmentEvidence", language)}
+                    align="left"
+                    className="agap-print-hide"
+                  />
+                </div>
                 {evidence.length > 0 ? (
                   <ul className="mt-3 space-y-2 text-xs leading-relaxed text-slate-700">
                     {evidence.map((item, index) => (
@@ -546,9 +636,18 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
               </div>
 
               <div className="rounded-xl border border-slate-200 p-4">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {language === "en" ? "Data Gaps / Limitations" : "Kulang na Datos / Limitasyon"}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {language === "en"
+                      ? "Information Gaps and Limitations"
+                      : "Kakulangan at Limitasyon ng Impormasyon"}
+                  </span>
+                  <HelpTooltip
+                    content={getHelpContent("dataGaps", language)}
+                    align="right"
+                    className="agap-print-hide"
+                  />
+                </div>
                 {dataGaps.length > 0 ? (
                   <ul className="mt-3 space-y-2 text-xs leading-relaxed text-slate-700">
                     {dataGaps.map((item, index) => (
@@ -564,8 +663,8 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
                 ) : (
                   <p className="mt-3 text-xs text-slate-500">
                     {language === "en"
-                      ? "No data-gap records have been supplied yet."
-                      : "Wala pang naibibigay na tala ng kakulangan sa datos."}
+                      ? "No information-gap or limitation records are available yet."
+                      : "Wala pang available na tala ng information gaps o limitations."}
                   </p>
                 )}
               </div>
@@ -577,8 +676,15 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
             <div className="mb-3 flex items-center gap-2">
               <ClipboardCheck className="h-4 w-4 text-blue-600" aria-hidden="true" />
               <h2 id="lgu-card-actions" className="text-sm font-bold text-slate-900">
-                {language === "en" ? "Recommended LGU Review Actions" : "Mga Inirerekomendang LGU Review Action"}
+                {language === "en"
+                  ? "Recommended LGU Actions for Review"
+                  : "Recommended LGU Actions for Review"}
               </h2>
+              <HelpTooltip
+                content={getHelpContent("recommendedLGUActions", language)}
+                align="left"
+                className="agap-print-hide"
+              />
             </div>
 
             {recommendations.length > 0 ? (
@@ -606,7 +712,7 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
 
                     <dl className="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
                       <div>
-                        <dt className="font-bold text-slate-400">Trigger</dt>
+                        <dt className="font-bold text-slate-400">Condition / Trigger</dt>
                         <dd className="mt-0.5 text-slate-700">{display(item.trigger)}</dd>
                       </div>
                       <div>
@@ -614,11 +720,11 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
                         <dd className="mt-0.5 text-slate-700">{display(item.evidence)}</dd>
                       </div>
                       <div>
-                        <dt className="font-bold text-slate-400">Source Rule</dt>
+                        <dt className="font-bold text-slate-400">Action Rule Reference</dt>
                         <dd className="mt-0.5 text-slate-700">{display(item.sourceRule)}</dd>
                       </div>
                       <div>
-                        <dt className="font-bold text-slate-400">Responsible Unit</dt>
+                        <dt className="font-bold text-slate-400">Responsible LGU Unit</dt>
                         <dd className="mt-0.5 text-slate-700">{display(item.responsibleUnit)}</dd>
                       </div>
                     </dl>
@@ -645,13 +751,13 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
                 <FileText className="mx-auto h-5 w-5 text-slate-400" aria-hidden="true" />
                 <p className="mt-2 text-sm font-semibold text-slate-700">
                   {language === "en"
-                    ? "No approved action-rule recommendations yet"
-                    : "Wala pang rekomendasyon mula sa approved action rules"}
+                    ? "No verified, source-based LGU actions are available yet"
+                    : "Wala pang verified at source-based na LGU actions"}
                 </p>
                 <p className="mx-auto mt-1 max-w-lg text-xs leading-relaxed text-slate-500">
                   {language === "en"
-                    ? "Recommendations will appear only after the backend matches verified conditions against the approved action-rule library."
-                    : "Lalabas lamang ang mga rekomendasyon kapag na-match ng backend ang beripikadong kondisyon sa approved action-rule library."}
+                    ? "Recommended actions will appear after verified conditions are matched with the approved action-rule library."
+                    : "Lalabas ang recommended actions kapag na-match ang verified conditions sa approved action-rule library."}
                 </p>
               </div>
             )}
@@ -666,8 +772,8 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
             </h2>
             <p className="mt-1 text-[11px] text-slate-500">
               {language === "en"
-                ? "Controls become active when their backend handlers are connected."
-                : "Magiging aktibo ang controls kapag nakakonekta na ang backend handlers."}
+                ? "These controls are available only to authorized LGU users. Disabled controls are not yet connected to the required system action."
+                : "Ang controls na ito ay para lamang sa authorized LGU users. Ang disabled controls ay hindi pa nakakonekta sa kinakailangang system action."}
             </p>
           </div>
 

@@ -9,6 +9,8 @@ import { LGUActionCard } from "@/components/assessment/LGUActionCard";
 import { HouseholdActionCard } from "@/components/household/HouseholdActionCard";
 import { PostImpactActionCard } from "@/components/recovery/PostImpactActionCard";
 import { ConnectivityStatus } from "@/components/feedback/ConnectivityStatus";
+import HelpTooltip from "@/components/ui/HelpTooltip";
+import { getHelpContent } from "@/lib/help-content";
 import {
   TOP_BARANGAYS,
   OTHER_BARANGAYS,
@@ -642,10 +644,10 @@ export const ModulePlaceholder: React.FC = () => {
         />
 
         <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs leading-relaxed text-blue-900">
-          <strong>{language === "en" ? "Integration boundary:" : "Integration boundary:"}</strong>{" "}
+          <strong>{language === "en" ? "Assessment note:" : "Tala sa assessment:"}</strong>{" "}
           {language === "en"
-            ? "This screen only presents values supplied by the application data layer. Risk computation, exposure estimation, capacity-gap calculation, validation, action-rule matching, assignments, overrides, and audit logging remain backend responsibilities."
-            : "Ipinapakita lamang ng screen na ito ang mga value na ibinibigay ng application data layer. Backend responsibility pa rin ang risk computation, exposure estimation, capacity-gap calculation, validation, action-rule matching, assignments, overrides, at audit logging."}
+            ? "This card shows only assessment values, evidence, and recommended actions supported by available system records. Missing or unverified information remains clearly identified for LGU review."
+            : "Ipinapakita lamang ng card na ito ang assessment values, evidence, at recommended actions na suportado ng available system records. Ang kulang o unverified information ay malinaw na minamarkahan para sa LGU review."}
         </div>
       </div>
     );
@@ -741,13 +743,13 @@ export const ModulePlaceholder: React.FC = () => {
           <div className="max-w-3xl">
             <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">
               {language === "en"
-                ? "Public Preparedness Flow"
-                : "Pampublikong Daloy ng Paghahanda"}
+                ? "Household Preparedness"
+                : "Paghahanda ng Household"}
             </span>
             <p className="mt-1 text-xs leading-relaxed text-slate-500">
               {language === "en"
-                ? "The Household Action Card supports a pseudonymous household code, a quick household profile, or a generic barangay-only flow. Backend action-rule matching is intentionally not simulated in the frontend."
-                : "Sinusuportahan ng Household Action Card ang pseudonymous household code, quick household profile, o generic barangay-only flow. Hindi kunwaring ginagawa ng frontend ang backend action-rule matching."}
+                ? "Choose a Household Code, answer a Quick Household Profile, or use the General Barangay Preparedness Card. AGAP will show only guidance supported by the available advisory and approved preparedness actions."
+                : "Pumili ng Household Code, sagutan ang Quick Household Profile, o gamitin ang Pangkalahatang Barangay Preparedness Card. Ipapakita lamang ng AGAP ang guidance na suportado ng available advisory at approved preparedness actions."}
             </p>
           </div>
         </div>
@@ -760,11 +762,11 @@ export const ModulePlaceholder: React.FC = () => {
 
         <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs leading-relaxed text-blue-900">
           <strong>
-            {language === "en" ? "Integration boundary:" : "Integration boundary:"}
+            {language === "en" ? "Card availability:" : "Availability ng card:"}
           </strong>{" "}
           {language === "en"
-            ? "Household lookup, approved action-rule matching, controlled explanation generation, cached profile retrieval, and offline fallback data are backend or synchronization responsibilities. Until those handlers are connected, this frontend accepts the three required input modes but will not fabricate a Household Action Card result."
-            : "Backend o synchronization responsibility ang household lookup, approved action-rule matching, controlled explanation generation, cached profile retrieval, at offline fallback data. Hangga't hindi nakakonekta ang mga handler na iyon, tatanggapin ng frontend ang tatlong required input mode ngunit hindi ito gagawa ng pekeng Household Action Card result."}
+            ? "A Household Action Card will appear only when the required advisory information and approved preparedness actions are available. AGAP will not invent missing household guidance."
+            : "Lalabas lamang ang Household Action Card kapag available ang kinakailangang advisory information at approved preparedness actions. Hindi mag-iimbento ang AGAP ng kulang na household guidance."}
         </div>
       </div>
     );
@@ -847,9 +849,15 @@ export const ModulePlaceholder: React.FC = () => {
               </div>
 
               <div className="min-w-0">
-                <span className="inline-flex rounded-full border border-blue-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-700">
-                  {language === "en" ? "Pending Sync" : "Pending Sync"}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span className="inline-flex rounded-full border border-blue-200 bg-white px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-700">
+                    {language === "en" ? "Pending Sync" : "Pending Sync"}
+                  </span>
+                  <HelpTooltip
+                    content={getHelpContent("pendingSync", language)}
+                    align="left"
+                  />
+                </div>
 
                 <h2 className="mt-2 text-xl font-bold text-slate-900">
                   {language === "en"
@@ -859,8 +867,8 @@ export const ModulePlaceholder: React.FC = () => {
 
                 <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
                   {language === "en"
-                    ? "This report is still UNVERIFIED. Pending Sync means it has not yet been confirmed as a synchronized or validated LGU record."
-                    : "UNVERIFIED pa rin ang ulat na ito. Ang Pending Sync ay nangangahulugang hindi pa ito kumpirmadong synchronized o validated LGU record."}
+                    ? "Saved as Pending Sync. The report remains unverified until synchronization and authorized review are completed."
+                    : "Na-save bilang Pending Sync. Unverified ang report hanggang matapos ang synchronization at authorized review."}
                 </p>
               </div>
             </div>
@@ -885,8 +893,12 @@ export const ModulePlaceholder: React.FC = () => {
               </div>
 
               <div className="rounded-xl border border-blue-100 bg-white p-3.5">
-                <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {language === "en" ? "Sync Status" : "Sync Status"}
+                <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <span>{language === "en" ? "Sync Status" : "Sync Status"}</span>
+                  <HelpTooltip
+                    content={getHelpContent("pendingSync", language)}
+                    align="left"
+                  />
                 </dt>
                 <dd className="mt-1 text-xs font-bold text-blue-700">
                   Pending Sync
@@ -894,8 +906,14 @@ export const ModulePlaceholder: React.FC = () => {
               </div>
 
               <div className="rounded-xl border border-blue-100 bg-white p-3.5">
-                <dt className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {language === "en" ? "Verification State" : "Verification State"}
+                <dt className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <span>
+                    {language === "en" ? "Verification Status" : "Verification Status"}
+                  </span>
+                  <HelpTooltip
+                    content={getHelpContent("verificationStatus", language)}
+                    align="right"
+                  />
                 </dt>
                 <dd className="mt-1 text-xs font-bold text-amber-700">
                   Unverified
@@ -907,11 +925,11 @@ export const ModulePlaceholder: React.FC = () => {
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
             <p className="text-xs leading-relaxed text-amber-900">
               <strong>
-                {language === "en" ? "Frontend limitation:" : "Frontend limitation:"}
+                {language === "en" ? "Prototype storage note:" : "Tala sa prototype storage:"}
               </strong>{" "}
               {language === "en"
-                ? "This prototype currently stores only the visible pending state in React memory. IndexedDB persistence, upload to Supabase, reconnect synchronization, conflict handling, and LGU validation must be provided by the backend/synchronization layer. Reloading the page may clear this temporary frontend state."
-                : "Sa prototype na ito, React memory lamang ang kasalukuyang nagtatago ng nakikitang pending state. Ang IndexedDB persistence, upload sa Supabase, reconnect synchronization, conflict handling, at LGU validation ay dapat manggaling sa backend/synchronization layer. Maaaring mawala ang temporary frontend state kapag ni-reload ang page."}
+                ? "Until database synchronization is connected, this temporary report may disappear when the page is reloaded. A report should be treated as submitted to the LGU system only after synchronization succeeds."
+                : "Hangga't hindi pa nakakonekta ang database synchronization, maaaring mawala ang temporary report kapag ni-reload ang page. Ituring lamang na naisumite sa LGU system ang report kapag matagumpay na ang synchronization."}
             </p>
           </div>
 
@@ -994,10 +1012,14 @@ export const ModulePlaceholder: React.FC = () => {
               Step {reportStep} of 6
             </span>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-700">
                 {language === "en" ? "Unverified" : "Unverified"}
               </span>
+              <HelpTooltip
+                content={getHelpContent("verificationStatus", language)}
+                align="right"
+              />
               <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 {language === "en" ? "Field Report" : "Field Report"}
               </span>
@@ -1055,11 +1077,17 @@ export const ModulePlaceholder: React.FC = () => {
                   ? "2. What incident occurred?"
                   : "2. Anong uri ng insidente ang naganap?"}
               </h2>
-              <p className="mt-1 text-xs text-slate-500">
-                {language === "en"
-                  ? "Choose the closest reported incident category. Counts below are reported figures only, not validated figures."
-                  : "Piliin ang pinakamalapit na reported incident category. Reported figures lamang ang mga bilang sa ibaba at hindi pa validated."}
-              </p>
+              <div className="mt-1 flex items-start gap-1.5">
+                <p className="text-xs text-slate-500">
+                  {language === "en"
+                    ? "Choose the closest reported incident category. The population and household counts below are reported figures only."
+                    : "Piliin ang pinakamalapit na reported incident category. Reported figures lamang ang population at household counts sa ibaba."}
+                </p>
+                <HelpTooltip
+                  content={getHelpContent("reportedFigures", language)}
+                  align="left"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -1081,10 +1109,16 @@ export const ModulePlaceholder: React.FC = () => {
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-slate-800">
-                  {language === "en"
-                    ? "Reported affected persons"
-                    : "Reported affected persons"}
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                  <span>
+                    {language === "en"
+                      ? "Reported Affected Persons"
+                      : "Reported Affected Persons"}
+                  </span>
+                  <HelpTooltip
+                    content={getHelpContent("reportedAffectedPersons", language)}
+                    align="left"
+                  />
                 </span>
                 <input
                   type="number"
@@ -1098,10 +1132,16 @@ export const ModulePlaceholder: React.FC = () => {
               </label>
 
               <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-slate-800">
-                  {language === "en"
-                    ? "Reported affected households"
-                    : "Reported affected households"}
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                  <span>
+                    {language === "en"
+                      ? "Reported Affected Households"
+                      : "Reported Affected Households"}
+                  </span>
+                  <HelpTooltip
+                    content={getHelpContent("reportedAffectedHouseholds", language)}
+                    align="right"
+                  />
                 </span>
                 <input
                   type="number"
@@ -1116,10 +1156,16 @@ export const ModulePlaceholder: React.FC = () => {
             </div>
 
             <label className="block">
-              <span className="mb-1.5 block text-xs font-bold text-slate-800">
-                {language === "en"
-                  ? "Reported vulnerable groups"
-                  : "Reported vulnerable groups"}
+              <span className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                <span>
+                  {language === "en"
+                    ? "Reported Vulnerable Groups"
+                    : "Reported Vulnerable Groups"}
+                </span>
+                <HelpTooltip
+                  content={getHelpContent("reportedVulnerableGroups", language)}
+                  align="left"
+                />
               </span>
               <textarea
                 value={reportedVulnerableGroups}
@@ -1139,15 +1185,21 @@ export const ModulePlaceholder: React.FC = () => {
         {reportStep === 3 && (
           <div className="space-y-5">
             <div>
-              <h2 className="text-base font-bold text-slate-900">
-                {language === "en"
-                  ? "3. What severity and damage were reported?"
-                  : "3. Anong severity at pinsala ang naiulat?"}
-              </h2>
+              <div className="flex items-center gap-1.5">
+                <h2 className="text-base font-bold text-slate-900">
+                  {language === "en"
+                    ? "3. Reported Damage Severity"
+                    : "3. Reported Damage Severity"}
+                </h2>
+                <HelpTooltip
+                  content={getHelpContent("fieldReportSeverity", language)}
+                  align="left"
+                />
+              </div>
               <p className="mt-1 text-xs text-slate-500">
                 {language === "en"
-                  ? "Severity is a field report classification and still requires authorized review."
-                  : "Field report classification lamang ang severity at kailangan pa rin ng awtorisadong review."}
+                  ? "Select the closest field classification, then describe the reported damage."
+                  : "Piliin ang pinakamalapit na field classification, pagkatapos ay ilarawan ang reported damage."}
               </p>
             </div>
 
@@ -1176,8 +1228,14 @@ export const ModulePlaceholder: React.FC = () => {
             </div>
 
             <label className="block">
-              <span className="mb-1.5 block text-xs font-bold text-slate-800">
-                {language === "en" ? "Reported damage summary" : "Buod ng reported damage"}
+              <span className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                <span>
+                  {language === "en" ? "Reported Damage Summary" : "Reported Damage Summary"}
+                </span>
+                <HelpTooltip
+                  content={getHelpContent("reportedDamage", language)}
+                  align="left"
+                />
               </span>
               <textarea
                 value={damageSummary}
@@ -1198,16 +1256,22 @@ export const ModulePlaceholder: React.FC = () => {
           <div className="space-y-5">
             <h2 className="text-base font-bold text-slate-900">
               {language === "en"
-                ? "4. What conditions and urgent needs were reported?"
-                : "4. Anong conditions at agarang pangangailangan ang naiulat?"}
+                ? "4. Conditions and Priority Needs"
+                : "4. Conditions at Priority Needs"}
             </h2>
 
             <div className="grid grid-cols-1 gap-3">
               <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-slate-800">
-                  {language === "en"
-                    ? "Critical-facility condition"
-                    : "Kalagayan ng critical facility"}
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                  <span>
+                    {language === "en"
+                      ? "Status of Critical Facilities"
+                      : "Kalagayan ng Critical Facilities"}
+                  </span>
+                  <HelpTooltip
+                    content={getHelpContent("criticalFacilities", language)}
+                    align="left"
+                  />
                 </span>
                 <textarea
                   value={criticalFacilityCondition}
@@ -1222,34 +1286,48 @@ export const ModulePlaceholder: React.FC = () => {
               </label>
 
               <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-slate-800">
-                  {language === "en" ? "Service disruption" : "Service disruption"}
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                  <span>
+                    {language === "en"
+                      ? "Lifeline Service Disruptions"
+                      : "Lifeline Service Disruptions"}
+                  </span>
+                  <HelpTooltip
+                    content={getHelpContent("lifelineServiceDisruptions", language)}
+                    align="left"
+                  />
                 </span>
                 <textarea
                   value={serviceDisruption}
                   onChange={(event) => setServiceDisruption(event.target.value)}
                   placeholder={
                     language === "en"
-                      ? "Optional: water, power, communications, health, or other reported disruption."
-                      : "Opsyonal: water, power, communications, health, o iba pang reported disruption."
+                      ? "Optional: power, water, communications, transport, roads, health services, or other reported disruption."
+                      : "Opsyonal: power, water, communications, transport, roads, health services, o ibang reported disruption."
                   }
                   className="min-h-[76px] w-full resize-y rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-600/20"
                 />
               </label>
 
               <label className="block">
-                <span className="mb-1.5 block text-xs font-bold text-slate-800">
-                  {language === "en"
-                    ? "Accessibility constraints"
-                    : "Accessibility constraints"}
+                <span className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                  <span>
+                    {language === "en"
+                      ? "Access Conditions"
+                      : "Access Conditions"}
+                  </span>
+                  <HelpTooltip
+                    content={getHelpContent("accessConditions", language)}
+                    align="left"
+                  />
                 </span>
                 <textarea
                   value={accessibilityConstraints}
                   onChange={(event) => setAccessibilityConstraints(event.target.value)}
                   placeholder={
                     language === "en"
-                      ? "Optional: blocked road, bridge condition, debris, flood depth report, or other access constraint."
-                      : "Opsyonal: blocked road, bridge condition, debris, flood depth report, o ibang access constraint."
+                      ? "Optional: road or bridge condition, flooding, landslide, debris, or transport disruption."
+                      : "Opsyonal: road o bridge condition, flooding, landslide, debris, o transport disruption."
                   }
                   className="min-h-[76px] w-full resize-y rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-600/20"
                 />
@@ -1257,11 +1335,17 @@ export const ModulePlaceholder: React.FC = () => {
             </div>
 
             <div>
-              <p className="mb-2 text-xs font-bold text-slate-800">
-                {language === "en"
-                  ? "Urgent unmet needs (select only what was reported)"
-                  : "Agarang unmet needs (piliin lamang ang naiulat)"}
-              </p>
+              <div className="mb-2 flex items-center gap-1.5">
+                <p className="text-xs font-bold text-slate-800">
+                  {language === "en"
+                    ? "Priority Needs (select only what was reported)"
+                    : "Priority Needs (piliin lamang ang naiulat)"}
+                </p>
+                <HelpTooltip
+                  content={getHelpContent("priorityNeeds", language)}
+                  align="left"
+                />
+              </div>
               <div className="grid grid-cols-2 gap-2.5">
                 {needsOptions.map((need) => {
                   const isChecked = selectedNeeds.includes(need);
@@ -1298,19 +1382,31 @@ export const ModulePlaceholder: React.FC = () => {
             <div>
               <h2 className="text-base font-bold text-slate-900">
                 {language === "en"
-                  ? "5. What is the report source or evidence?"
-                  : "5. Ano ang source o ebidensya ng report?"}
+                  ? "5. What is the report source and supporting evidence?"
+                  : "5. Ano ang source at supporting evidence ng report?"}
               </h2>
-              <p className="mt-1 text-xs text-slate-500">
-                {language === "en"
-                  ? "Use a role, team, bulletin/reference, or other non-sensitive source description when possible."
-                  : "Gumamit ng role, team, bulletin/reference, o ibang non-sensitive source description kung maaari."}
-              </p>
+              <div className="mt-1 flex items-start gap-1.5">
+                <p className="text-xs text-slate-500">
+                  {language === "en"
+                    ? "Use a role, team, bulletin/reference, or other non-sensitive source description when possible."
+                    : "Gumamit ng role, team, bulletin/reference, o ibang non-sensitive source description kung maaari."}
+                </p>
+                <HelpTooltip
+                  content={getHelpContent("reportSourceEvidence", language)}
+                  align="left"
+                />
+              </div>
             </div>
 
             <label className="block">
-              <span className="mb-1.5 block text-xs font-bold text-slate-800">
-                {language === "en" ? "Source / reporter reference" : "Source / reporter reference"}
+              <span className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                <span>
+                  {language === "en" ? "Report Source / Reference" : "Report Source / Reference"}
+                </span>
+                <HelpTooltip
+                  content={getHelpContent("reportSourceEvidence", language)}
+                  align="left"
+                />
               </span>
               <input
                 value={reportSourceReference}
@@ -1353,7 +1449,7 @@ export const ModulePlaceholder: React.FC = () => {
 
             <label className="block">
               <span className="mb-1.5 block text-xs font-bold text-slate-800">
-                {language === "en" ? "Evidence notes" : "Evidence notes"}
+                {language === "en" ? "Supporting Evidence Notes" : "Tala sa Supporting Evidence"}
               </span>
               <textarea
                 value={photoNote}
@@ -1380,18 +1476,18 @@ export const ModulePlaceholder: React.FC = () => {
               {[
                 ["Barangay", selectedReportBarangay || "—"],
                 ["Incident", selectedIncident || "—"],
-                ["Reported severity", selectedSeverity || "—"],
-                ["Reported affected persons", reportedAffectedPersons || "Unknown"],
-                ["Reported affected households", reportedAffectedHouseholds || "Unknown"],
-                ["Reported vulnerable groups", reportedVulnerableGroups || "None specified"],
-                ["Damage summary", damageSummary || "—"],
-                ["Critical-facility condition", criticalFacilityCondition || "None specified"],
-                ["Service disruption", serviceDisruption || "None specified"],
-                ["Accessibility constraints", accessibilityConstraints || "None specified"],
-                ["Urgent unmet needs", selectedNeeds.join(", ") || "None specified"],
-                ["Source / reporter reference", reportSourceReference || "—"],
-                ["Evidence attachment", evidenceFileName || "None"],
-                ["Evidence notes", photoNote || "None specified"],
+                ["Reported Damage Severity", selectedSeverity || "—"],
+                ["Reported Affected Persons", reportedAffectedPersons || "Unknown"],
+                ["Reported Affected Households", reportedAffectedHouseholds || "Unknown"],
+                ["Reported Vulnerable Groups", reportedVulnerableGroups || "None specified"],
+                ["Reported Damage Summary", damageSummary || "—"],
+                ["Status of Critical Facilities", criticalFacilityCondition || "None specified"],
+                ["Lifeline Service Disruptions", serviceDisruption || "None specified"],
+                ["Access Conditions", accessibilityConstraints || "None specified"],
+                ["Priority Needs", selectedNeeds.join(", ") || "None specified"],
+                ["Report Source / Reference", reportSourceReference || "—"],
+                ["Supporting Evidence Attachment", evidenceFileName || "None"],
+                ["Supporting Evidence Notes", photoNote || "None specified"],
               ].map(([label, value]) => (
                 <div
                   key={label}
@@ -1404,16 +1500,26 @@ export const ModulePlaceholder: React.FC = () => {
                 </div>
               ))}
 
-              <div className="flex justify-between border-t border-slate-100 pt-2">
-                <span className="text-slate-400">
-                  {language === "en" ? "Verification:" : "Verification:"}
+              <div className="flex items-center justify-between border-t border-slate-100 pt-2">
+                <span className="flex items-center gap-1.5 text-slate-400">
+                  <span>
+                    {language === "en" ? "Verification Status:" : "Verification Status:"}
+                  </span>
+                  <HelpTooltip
+                    content={getHelpContent("verificationStatus", language)}
+                    align="right"
+                  />
                 </span>
                 <span className="font-bold text-amber-700">Unverified</span>
               </div>
 
-              <div className="flex justify-between">
-                <span className="text-slate-400">
-                  {language === "en" ? "After local save:" : "Pagkatapos ng local save:"}
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-slate-400">
+                  <span>{language === "en" ? "Sync Status:" : "Sync Status:"}</span>
+                  <HelpTooltip
+                    content={getHelpContent("pendingSync", language)}
+                    align="right"
+                  />
                 </span>
                 <span className="font-bold text-blue-700">Pending Sync</span>
               </div>
@@ -1421,8 +1527,8 @@ export const ModulePlaceholder: React.FC = () => {
 
             <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-3.5 text-xs leading-relaxed text-blue-900">
               {language === "en"
-                ? "Saving creates only a client-side Pending Sync state in this frontend prototype. Reported values remain distinct from validated values until the synchronization and authorized LGU review backend is connected."
-                : "Client-side Pending Sync state lamang ang ginagawa ng save sa frontend prototype na ito. Mananatiling hiwalay ang reported values sa validated values hangga't hindi nakakonekta ang synchronization at authorized LGU review backend."}
+                ? "Saving marks this report as Pending Sync in the current prototype. The reported information remains unverified until it is synchronized and reviewed by an authorized LGU user."
+                : "Kapag na-save, mamarkahan ang report bilang Pending Sync sa kasalukuyang prototype. Mananatiling unverified ang reported information hanggang ma-sync at masuri ng authorized LGU user."}
             </div>
           </div>
         )}
@@ -1545,12 +1651,12 @@ export const ModulePlaceholder: React.FC = () => {
         <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs leading-relaxed text-blue-900">
           <strong>
             {language === "en"
-              ? "Integration boundary:"
-              : "Integration boundary:"}
+              ? "Post-impact review note:"
+              : "Tala sa post-impact review:"}
           </strong>{" "}
           {language === "en"
-            ? "The frontend does not calculate recovery priority, validate affected-population figures, allocate relief, or invent post-impact actions. Those records and source-anchored recommendations must come from the backend and authorized LGU review workflow."
-            : "Hindi kinakalkula ng frontend ang recovery priority, hindi nito bina-validate ang affected-population figures, hindi ito naglalaan ng relief, at hindi ito gumagawa ng post-impact actions. Dapat manggaling ang mga record at source-anchored recommendations sa backend at awtorisadong LGU review workflow."}
+            ? "Reported impacts remain separate from validated impacts. AGAP does not automatically allocate relief or invent post-disaster actions; authorized LGU users review the available evidence and approved recommendations."
+            : "Nananatiling hiwalay ang reported impacts sa validated impacts. Hindi awtomatikong nag-aallocate ng relief o nag-iimbento ng post-disaster actions ang AGAP; sinusuri ng authorized LGU users ang available evidence at approved recommendations."}
         </div>
       </div>
     );

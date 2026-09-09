@@ -10,6 +10,8 @@ import {
   Users,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import HelpTooltip from "@/components/ui/HelpTooltip";
+import { getHelpContent, type HelpContentDefinition } from "@/lib/help-content";
 
 export type PostImpactVerificationState =
   | "UNVERIFIED"
@@ -104,10 +106,14 @@ function MetricCard({
   label,
   value,
   emphasis = false,
+  helpContent,
+  helpAlign = "left",
 }: {
   label: string;
   value: string | null | undefined;
   emphasis?: boolean;
+  helpContent?: HelpContentDefinition;
+  helpAlign?: "left" | "center" | "right";
 }) {
   return (
     <div
@@ -117,8 +123,11 @@ function MetricCard({
           : "border-slate-200 bg-slate-50/70"
       }`}
     >
-      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-        {label}
+      <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+        <span>{label}</span>
+        {helpContent ? (
+          <HelpTooltip content={helpContent} align={helpAlign} />
+        ) : null}
       </span>
       <span className="mt-1 block text-sm font-semibold text-slate-900">
         {display(value)}
@@ -250,12 +259,18 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
   const renderActionGroup = (
     titleEn: string,
     titleFil: string,
-    items: PostImpactActionItem[]
+    items: PostImpactActionItem[],
+    helpContent?: HelpContentDefinition
   ) => (
     <section>
-      <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-        {language === "en" ? titleEn : titleFil}
-      </h3>
+      <div className="flex items-center gap-1.5">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+          {language === "en" ? titleEn : titleFil}
+        </h3>
+        {helpContent ? (
+          <HelpTooltip content={helpContent} align="left" />
+        ) : null}
+      </div>
 
       {items.length > 0 ? (
         <div className="mt-3 space-y-3">
@@ -295,7 +310,7 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
 
                 <div>
                   <dt className="font-bold text-slate-400">
-                    {language === "en" ? "Source Rule" : "Source Rule"}
+                    {language === "en" ? "Action Rule Reference" : "Reference ng Action Rule"}
                   </dt>
                   <dd className="mt-0.5 text-slate-700">
                     {display(item.sourceRule)}
@@ -314,8 +329,8 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
                 <div>
                   <dt className="font-bold text-slate-400">
                     {language === "en"
-                      ? "LGU Confirmation"
-                      : "LGU Confirmation"}
+                      ? "LGU Confirmation Required"
+                      : "Kailangan ang LGU Confirmation"}
                   </dt>
                   <dd className="mt-0.5 text-slate-700">
                     {item.confirmationRequired === null
@@ -365,8 +380,8 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
         <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-5 text-center">
           <p className="text-xs text-slate-500">
             {language === "en"
-              ? "No source-anchored actions have been supplied yet."
-              : "Wala pang source-anchored actions na ibinigay."}
+              ? "No verified, source-based actions are available yet."
+              : "Wala pang verified at source-based na actions na available."}
           </p>
         </div>
       )}
@@ -415,8 +430,8 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
 
         <p className="mt-4 rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-xs leading-relaxed text-blue-900">
           {language === "en"
-            ? "This card uses reported and validated post-impact evidence. It does not use an arbitrary recovery score, automatically allocate relief, or replace authorized LGU decisions."
-            : "Gumagamit ang card na ito ng reported at validated post-impact evidence. Hindi ito gumagamit ng arbitrary recovery score, awtomatikong naglalaan ng relief, o pumapalit sa awtorisadong desisyon ng LGU."}
+            ? "Reported and validated information are kept separate. AGAP does not automatically allocate relief or replace authorized LGU decisions."
+            : "Hiwalay ang reported at validated information. Hindi awtomatikong nag-aallocate ng relief o pumapalit sa authorized LGU decisions ang AGAP."}
         </p>
       </div>
 
@@ -430,9 +445,13 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
               className="text-sm font-bold text-slate-900"
             >
               {language === "en"
-                ? "Observed Population Impacts"
-                : "Naobserbahang Epekto sa Populasyon"}
+                ? "Social Impact — Affected Population & Households"
+                : "Social Impact — Apektadong Populasyon at mga Sambahayan"}
             </h2>
+            <HelpTooltip
+              content={getHelpContent("socialImpactAffectedPopulation", language)}
+              align="left"
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -443,6 +462,7 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
                   : "Reported Affected Persons"
               }
               value={observedImpacts?.reportedAffectedPersons}
+              helpContent={getHelpContent("reportedAffectedPersons", language)}
             />
             <MetricCard
               label={
@@ -452,14 +472,18 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
               }
               value={observedImpacts?.validatedAffectedPersons}
               emphasis
+              helpContent={getHelpContent("validatedAffectedPersons", language)}
+              helpAlign="center"
             />
             <MetricCard
               label={
                 language === "en"
-                  ? "Population Awaiting Validation"
-                  : "Population Awaiting Validation"
+                  ? "Affected Persons Pending Validation"
+                  : "Affected Persons Pending Validation"
               }
               value={observedImpacts?.awaitingValidationPersons}
+              helpContent={getHelpContent("affectedPersonsPendingValidation", language)}
+              helpAlign="right"
             />
             <MetricCard
               label={
@@ -468,6 +492,7 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
                   : "Reported Affected Households"
               }
               value={observedImpacts?.reportedAffectedHouseholds}
+              helpContent={getHelpContent("reportedAffectedHouseholds", language)}
             />
             <MetricCard
               label={
@@ -477,20 +502,24 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
               }
               value={observedImpacts?.validatedAffectedHouseholds}
               emphasis
+              helpContent={getHelpContent("validatedAffectedHouseholds", language)}
+              helpAlign="center"
             />
             <MetricCard
               label={
                 language === "en"
-                  ? "Vulnerable Groups Reported"
+                  ? "Reported Vulnerable Groups"
                   : "Reported Vulnerable Groups"
               }
               value={observedImpacts?.vulnerableGroupsReported}
+              helpContent={getHelpContent("reportedVulnerableGroups", language)}
+              helpAlign="right"
             />
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-slate-500">
             <span>
-              {language === "en" ? "Last validated:" : "Huling validation:"}{" "}
+              {language === "en" ? "Last validation update:" : "Huling validation update:"}{" "}
               <strong className="text-slate-700">
                 {display(observedImpacts?.lastValidatedAt)}
               </strong>
@@ -507,47 +536,60 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
               className="text-sm font-bold text-slate-900"
             >
               {language === "en"
-                ? "Damage, Services, Access, and Urgent Needs"
-                : "Pinsala, Serbisyo, Access, at Agarang Pangangailangan"}
+                ? "Damage, Status of Lifelines & Priority Needs"
+                : "Damage, Status of Lifelines & Priority Needs"}
             </h2>
+            <HelpTooltip
+              content={getHelpContent("damageLifelinesPriorityNeeds", language)}
+              align="left"
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <MetricCard
-              label={language === "en" ? "Damage Reports" : "Damage Reports"}
+              label={language === "en" ? "Reported Damage" : "Naiulat na Pinsala"}
               value={observedImpacts?.damageSummary}
+              helpContent={getHelpContent("reportedDamage", language)}
             />
             <MetricCard
               label={
                 language === "en"
-                  ? "Critical-Facility Condition"
-                  : "Kalagayan ng Critical Facility"
+                  ? "Status of Critical Facilities"
+                  : "Kalagayan ng Critical Facilities"
               }
               value={observedImpacts?.criticalFacilityCondition}
-            />
-            <MetricCard
-              label={
-                language === "en" ? "Service Disruption" : "Service Disruption"
-              }
-              value={observedImpacts?.serviceDisruption}
+              helpContent={getHelpContent("criticalFacilities", language)}
+              helpAlign="right"
             />
             <MetricCard
               label={
                 language === "en"
-                  ? "Accessibility Constraints"
-                  : "Accessibility Constraints"
+                  ? "Lifeline Service Disruptions"
+                  : "Lifeline Service Disruptions"
+              }
+              value={observedImpacts?.serviceDisruption}
+              helpContent={getHelpContent("lifelineServiceDisruptions", language)}
+            />
+            <MetricCard
+              label={
+                language === "en"
+                  ? "Access Conditions"
+                  : "Access Conditions"
               }
               value={observedImpacts?.accessibilityConstraints}
+              helpContent={getHelpContent("accessConditions", language)}
+              helpAlign="right"
             />
             <div className="sm:col-span-2">
               <MetricCard
                 label={
                   language === "en"
-                    ? "Urgent Unmet Needs"
-                    : "Agarang Hindi Natutugunang Pangangailangan"
+                    ? "Priority Needs"
+                    : "Pangunahing Pangangailangan"
                 }
                 value={observedImpacts?.urgentUnmetNeeds}
                 emphasis
+                helpContent={getHelpContent("priorityNeeds", language)}
               />
             </div>
           </div>
@@ -562,46 +604,68 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
               className="text-sm font-bold text-slate-900"
             >
               {language === "en"
-                ? "Pre-Event Estimate vs Post-Event Observation"
-                : "Pre-Event Estimate vs Post-Event Observation"}
+                ? "Pre-Disaster Exposure vs Validated Post-Disaster Impact"
+                : "Pre-Disaster Exposure vs Validated Post-Disaster Impact"}
             </h2>
+            <HelpTooltip
+              content={getHelpContent("prePostImpactComparison", language)}
+              align="left"
+            />
           </div>
 
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
             <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                {language === "en"
-                  ? "Pre-Event Estimate"
-                  : "Pre-Event Estimate"}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {language === "en"
+                    ? "Pre-Disaster Exposure Estimate"
+                    : "Tantyang Exposure Bago ang Sakuna"}
+                </span>
+                <HelpTooltip
+                  content={getHelpContent("preDisasterExposureEstimate", language)}
+                  align="left"
+                />
+              </div>
               <p className="mt-2 text-sm font-semibold text-slate-900">
                 {display(
                   preEventComparison?.estimatedPotentiallyExposedPopulation
                 )}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                {language === "en" ? "Method:" : "Paraan:"}{" "}
+                {language === "en" ? "Estimation Method:" : "Paraan ng Pagtatantiya:"}{" "}
                 {display(preEventComparison?.estimateMethod)}
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                {language === "en" ? "Confidence:" : "Confidence:"}{" "}
+                <span className="inline-flex items-center gap-1">
+                  {language === "en" ? "Confidence Level:" : "Confidence Level:"}
+                  <HelpTooltip
+                    content={getHelpContent("confidenceLevel", language)}
+                    align="left"
+                  />
+                </span>{" "}
                 {display(preEventComparison?.estimateConfidence)}
               </p>
             </div>
 
             <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
-                {language === "en"
-                  ? "Post-Event Validated Observation"
-                  : "Post-Event Validated Observation"}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600">
+                  {language === "en"
+                    ? "Validated Post-Disaster Impact"
+                    : "Beripikadong Epekto Pagkatapos ng Sakuna"}
+                </span>
+                <HelpTooltip
+                  content={getHelpContent("validatedPostDisasterImpact", language)}
+                  align="right"
+                />
+              </div>
               <p className="mt-2 text-sm font-semibold text-slate-900">
                 {display(observedImpacts?.validatedAffectedPersons)}
               </p>
               <p className="mt-1 text-xs leading-relaxed text-slate-600">
                 {language === "en"
-                  ? "This is a field-validated figure when supplied by the backend and must remain visibly distinct from the pre-event estimate."
-                  : "Field-validated figure ito kapag ibinigay ng backend at dapat manatiling malinaw na hiwalay sa pre-event estimate."}
+                  ? "Shown only when post-disaster reports have been checked and confirmed by authorized personnel. This value is kept separate from the pre-disaster estimate."
+                  : "Ipinapakita lamang ito kapag nasuri at nakumpirma na ng awtorisadong personnel ang post-disaster reports. Hiwalay ang value na ito sa pre-disaster estimate."}
               </p>
             </div>
           </div>
@@ -619,9 +683,13 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
               className="text-sm font-bold text-slate-900"
             >
               {language === "en"
-                ? "Validation Gaps Requiring Review"
-                : "Validation Gaps na Kailangang Suriin"}
+                ? "Information Pending Validation"
+                : "Impormasyong Hinihintay ang Validation"}
             </h2>
+            <HelpTooltip
+              content={getHelpContent("informationPendingValidation", language)}
+              align="left"
+            />
           </div>
 
           {dataGaps.length > 0 ? (
@@ -640,8 +708,8 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
             <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-5 text-center">
               <p className="text-xs text-slate-500">
                 {language === "en"
-                  ? "No validation-gap records have been supplied yet."
-                  : "Wala pang naibibigay na validation-gap records."}
+                  ? "No pending-validation information is available in this card yet."
+                  : "Wala pang pending-validation information na available sa card na ito."}
               </p>
             </div>
           )}
@@ -656,21 +724,22 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
               className="text-sm font-bold text-slate-900"
             >
               {language === "en"
-                ? "LGU Review Actions and Ways Forward"
-                : "LGU Review Actions at Ways Forward"}
+                ? "LGU Actions and Next Steps"
+                : "Mga Aksyon at Susunod na Hakbang ng LGU"}
             </h2>
           </div>
 
           <div className="space-y-6">
             {renderActionGroup(
-              "Immediate LGU Actions",
-              "Agarang LGU Actions",
+              "Immediate Response Actions",
+              "Agarang Response Actions",
               immediateActions
             )}
             {renderActionGroup(
-              "Stabilization Actions",
-              "Stabilization Actions",
-              stabilizationActions
+              "Stabilization and Early Recovery Actions",
+              "Stabilization at Early Recovery Actions",
+              stabilizationActions,
+              getHelpContent("stabilizationAndEarlyRecovery", language)
             )}
             {renderActionGroup(
               "Mitigation and Ways Forward",
@@ -703,7 +772,7 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
             disabled={!onValidateImpacts}
             className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition enabled:hover:border-blue-200 enabled:hover:bg-blue-50 enabled:hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-45"
           >
-            {language === "en" ? "Validate Impacts" : "I-validate ang Epekto"}
+            {language === "en" ? "Validate Reported Impacts" : "I-validate ang Naiulat na Epekto"}
           </button>
 
           <button
