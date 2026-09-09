@@ -112,11 +112,9 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             sourceLabel: "Issuing source",
             sourcePlaceholder: "e.g. PAGASA • DOST",
             issuedLabel: "Issued / updated time",
-            issuedPlaceholder: "e.g. Updated 11:00 AM Today",
             bulletinLabel: "Bulletin / reference number",
             bulletinPlaceholder: "e.g. Bulletin #4",
             validityLabel: "Validity / effective period",
-            validityPlaceholder: "e.g. Valid until 2:00 PM, 9 Sep 2026",
             affectedLocationsLabel: "Affected locations",
             affectedLocationsPlaceholder:
               "Enter only locations explicitly identified by the issuing source.",
@@ -164,11 +162,9 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             sourceLabel: "Ahensyang naglabas",
             sourcePlaceholder: "hal. PAGASA • DOST",
             issuedLabel: "Oras ng paglabas / update",
-            issuedPlaceholder: "hal. Na-update 11:00 AM Ngayon",
             bulletinLabel: "Bulletin / reference number",
             bulletinPlaceholder: "hal. Bulletin #4",
             validityLabel: "Validity / panahon ng bisa",
-            validityPlaceholder: "hal. May bisa hanggang 2:00 PM, 9 Sep 2026",
             affectedLocationsLabel: "Mga apektadong lugar",
             affectedLocationsPlaceholder:
               "Ilagay lamang ang mga lugar na tahasang tinukoy ng ahensyang naglabas.",
