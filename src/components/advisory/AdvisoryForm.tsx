@@ -12,6 +12,7 @@ export interface AdvisoryFormValues {
   issuedTime: string;
   bulletinNumber: string;
   validity: string;
+  coverageLevel: "PROVINCE" | "CITY_MUNICIPALITY" | "BARANGAY" | "SPECIFIC_AREA";
   affectedLocations: string;
   warningInformation: string;
   sourceUrl: string;
@@ -32,6 +33,7 @@ const DEFAULT_VALUES: AdvisoryFormValues = {
   issuedTime: "",
   bulletinNumber: "",
   validity: "",
+  coverageLevel: "SPECIFIC_AREA",
   affectedLocations: "",
   warningInformation: "",
   sourceUrl: "",
@@ -122,7 +124,12 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             bulletinPlaceholder: "e.g. Bulletin #4",
             validityLabel: "Validity / effective period",
             validityPlaceholder: "e.g. Valid until 2:00 PM, 9 Sep 2026",
-            affectedLocationsLabel: "Affected locations",
+            coverageLevelLabel: "Source geographic coverage",
+            coverageProvince: "Province",
+            coverageCity: "City / Municipality",
+            coverageBarangay: "Barangay",
+            coverageSpecific: "Specific area",
+            affectedLocationsLabel: "Locations named by the source",
             affectedLocationsPlaceholder:
               "Enter only locations explicitly identified by the issuing source.",
             warningInformationLabel: "Warning information",
@@ -182,7 +189,12 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             bulletinPlaceholder: "hal. Bulletin #4",
             validityLabel: "Validity / panahon ng bisa",
             validityPlaceholder: "hal. May bisa hanggang 2:00 PM, 9 Sep 2026",
-            affectedLocationsLabel: "Mga apektadong lugar",
+            coverageLevelLabel: "Saklaw na heograpiko ng source",
+            coverageProvince: "Probinsya",
+            coverageCity: "Lungsod / Munisipalidad",
+            coverageBarangay: "Barangay",
+            coverageSpecific: "Tiyak na lugar",
+            affectedLocationsLabel: "Mga lugar na tahasang binanggit ng source",
             affectedLocationsPlaceholder:
               "Ilagay lamang ang mga lugar na tahasang tinukoy ng ahensyang naglabas.",
             warningInformationLabel: "Impormasyon ng warning",
@@ -277,6 +289,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
           issuedTime: string | null;
           bulletinNumber: string | null;
           validity: string | null;
+          coverageLevel: "PROVINCE" | "CITY_MUNICIPALITY" | "BARANGAY" | "SPECIFIC_AREA" | null;
           affectedLocations: string[];
           warningInformation: string | null;
           sourceUrl: string | null;
@@ -295,6 +308,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
         issuedTime: result.fields.issuedTime ?? "",
         bulletinNumber: result.fields.bulletinNumber ?? "",
         validity: result.fields.validity ?? "",
+        coverageLevel: result.fields.coverageLevel ?? current.coverageLevel,
         affectedLocations: result.fields.affectedLocations.join(", "),
         warningInformation: result.fields.warningInformation ?? "",
         sourceUrl: result.fields.sourceUrl ?? "",
@@ -444,6 +458,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
       issuedTime: values.issuedTime.trim(),
       bulletinNumber: values.bulletinNumber.trim(),
       validity: values.validity.trim(),
+      coverageLevel: values.coverageLevel,
       affectedLocations: values.affectedLocations.trim(),
       warningInformation: values.warningInformation.trim(),
       sourceUrl: values.sourceUrl.trim(),
@@ -742,6 +757,26 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
               aria-invalid={Boolean(errors.validity)}
             />
           </Field>
+
+          <Field label={copy.coverageLevelLabel}>
+            <select
+              value={values.coverageLevel}
+              onChange={(event) =>
+                updateField(
+                  "coverageLevel",
+                  event.target.value as AdvisoryFormValues["coverageLevel"],
+                )
+              }
+              className={inputClass(false)}
+            >
+              <option value="PROVINCE">{copy.coverageProvince}</option>
+              <option value="CITY_MUNICIPALITY">{copy.coverageCity}</option>
+              <option value="BARANGAY">{copy.coverageBarangay}</option>
+              <option value="SPECIFIC_AREA">{copy.coverageSpecific}</option>
+            </select>
+          </Field>
+
+          <div className="hidden sm:block" />
 
           <Field
             label={copy.affectedLocationsLabel}
