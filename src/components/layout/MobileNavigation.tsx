@@ -3,12 +3,17 @@
 import React from "react";
 import { useNavigation } from "@/context/NavigationContext";
 import { useLanguage } from "@/context/LanguageContext";
-import { PrimaryModuleId } from "@/lib/mock-data";
-import { LayoutDashboard, Shield, FileEdit, TrendingUp } from "lucide-react";
+import { PrimaryModuleId } from "@/lib/mock-data"
+import { Home, Shield, FileEdit, TrendingUp } from "lucide-react";
 
 export const MobileBottomNav: React.FC = () => {
-  const { currentModule, setCurrentModule, setPrepareSubView } = useNavigation();
-  const { language, t } = useLanguage();
+  const {
+    currentModule,
+    setCurrentModule,
+    setPrepareSubView,
+    isBarangayUser,
+  } = useNavigation();
+  const { t } = useLanguage();
 
   const handleNavClick = (moduleId: PrimaryModuleId) => {
     setCurrentModule(moduleId);
@@ -20,37 +25,41 @@ export const MobileBottomNav: React.FC = () => {
   const navItems = [
     {
       id: "home" as PrimaryModuleId,
-      label: language === "en" ? "Home" : "Tahanan",
-      accessibleLabel: t("navHome"),
-      icon: LayoutDashboard,
+      label: t("navHome"),
+      icon: Home,
     },
     {
       id: "prepare" as PrimaryModuleId,
-      label: language === "en" ? "Prepare" : "Paghahanda",
-      accessibleLabel: t("navPrepare"),
+      label: t("navPrepare"),
       icon: Shield,
     },
     {
       id: "report-damage" as PrimaryModuleId,
-      label: language === "en" ? "Report" : "Ulat",
-      accessibleLabel: t("navReport"),
+      label: t("navReport"),
       icon: FileEdit,
     },
     {
       id: "recovery" as PrimaryModuleId,
-      label: language === "en" ? "Recovery" : "Pagbangon",
-      accessibleLabel: t("navRecovery"),
+      label: t("navRecovery"),
       icon: TrendingUp,
     },
   ];
 
+  const visibleNavItems = isBarangayUser
+    ? navItems.filter((item) => item.id !== "recovery")
+    : navItems;
+
   return (
     <nav
-      className="lg:hidden fixed bottom-0 left-0 right-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur-sm pb-[env(safe-area-inset-bottom)]"
-      aria-label="Primary mobile navigation"
+      className="lg:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-slate-200 px-3 pb-[env(safe-area-inset-bottom)]"
+      aria-label="Mobile Navigation"
     >
-      <div className="grid h-16 grid-cols-4 max-w-md mx-auto px-2">
-        {navItems.map((item) => {
+      <div
+        className={`grid h-16 max-w-md mx-auto items-center ${
+          isBarangayUser ? "grid-cols-3" : "grid-cols-4"
+        }`}
+      >
+        {visibleNavItems.map((item) => {
           const isActive = currentModule === item.id;
           const Icon = item.icon;
 
@@ -59,31 +68,15 @@ export const MobileBottomNav: React.FC = () => {
               key={item.id}
               type="button"
               onClick={() => handleNavClick(item.id)}
-              className={`group flex min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 py-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 ${
-                isActive ? "text-blue-700" : "text-slate-500 hover:text-slate-800"
+              className={`flex flex-col items-center justify-center gap-1 h-full transition-colors min-h-[48px] ${
+                isActive
+                  ? "text-blue-700 font-bold"
+                  : "text-slate-500 hover:text-slate-800 font-medium"
               }`}
               aria-current={isActive ? "page" : undefined}
-              aria-label={item.accessibleLabel}
-              title={item.accessibleLabel}
             >
-              <span
-                className={`flex h-8 w-10 items-center justify-center rounded-lg transition-colors ${
-                  isActive
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-slate-400 group-hover:bg-slate-50 group-hover:text-slate-700"
-                }`}
-                aria-hidden="true"
-              >
-                <Icon className="h-[19px] w-[19px]" />
-              </span>
-
-              <span
-                className={`max-w-full truncate text-[10px] leading-none tracking-tight ${
-                  isActive ? "font-bold" : "font-medium"
-                }`}
-              >
-                {item.label}
-              </span>
+              <Icon className={`w-5 h-5 ${isActive ? "text-blue-700" : "text-slate-400"}`} />
+              <span className="text-[11px] tracking-tight">{item.label}</span>
             </button>
           );
         })}

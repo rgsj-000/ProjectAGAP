@@ -552,7 +552,7 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
             <div className="mb-3 flex items-center gap-2">
               <Building2 className="h-4 w-4 text-blue-600" aria-hidden="true" />
               <h2 id="lgu-card-capacity" className="text-sm font-bold text-slate-900">
-                {language === "en" ? "Preparedness Capacity" : "Kapasidad sa Paghahanda"}
+                {language === "en" ? "Evacuation Capacity" : "Kapasidad sa Paghahanda"}
               </h2>
               <HelpTooltip
                 content={getHelpContent("preparednessCapacity", language)}

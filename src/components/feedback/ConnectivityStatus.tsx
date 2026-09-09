@@ -29,6 +29,7 @@ export interface ConnectivityStatusProps {
   actionRequiredMessage?: string | null;
   onOpenSyncQueue?: () => void;
   compact?: boolean;
+  audience?: "operations" | "public";
   className?: string;
 }
 
@@ -76,6 +77,7 @@ export const ConnectivityStatus: React.FC<ConnectivityStatusProps> = ({
   actionRequiredMessage = null,
   onOpenSyncQueue,
   compact = false,
+  audience = "operations",
   className = "",
 }) => {
   const { language } = useLanguage();
@@ -136,7 +138,33 @@ export const ConnectivityStatus: React.FC<ConnectivityStatusProps> = ({
 
   const meta = statusStyles[effectiveStatus];
   const label = labels[effectiveStatus][language];
-  const description = descriptions[effectiveStatus][language];
+  const operationsDescription = descriptions[effectiveStatus][language];
+  const publicDescriptions: Record<ConnectivityState, { en: string; fil: string }> = {
+    ONLINE: {
+      en: "Internet is available. Check the last data sync and advisory validity before using the preparedness guidance.",
+      fil: "May internet connection. Tingnan ang huling data sync at advisory validity bago gamitin ang preparedness guidance.",
+    },
+    OFFLINE: {
+      en: "No usable internet connection. Previously loaded preparedness guidance may still be available from cached verified information.",
+      fil: "Walang magamit na internet connection. Maaaring available pa rin ang dating na-load na preparedness guidance mula sa cached verified information.",
+    },
+    STALE: {
+      en: "The saved advisory or preparedness information may be outdated. Confirm the latest LGU or barangay instructions when communication is available.",
+      fil: "Maaaring luma na ang saved advisory o preparedness information. Kumpirmahin ang pinakabagong LGU o barangay instructions kapag may communication.",
+    },
+    SYNCING: {
+      en: "The page is refreshing synchronized information.",
+      fil: "Nire-refresh ng page ang synchronized information.",
+    },
+    ACTION_REQUIRED: {
+      en: "Some synchronized information needs review. Use only clearly verified public guidance.",
+      fil: "May synchronized information na kailangang ma-review. Gamitin lamang ang malinaw na verified public guidance.",
+    },
+  };
+  const description =
+    audience === "public"
+      ? publicDescriptions[effectiveStatus][language]
+      : operationsDescription;
 
   if (compact) {
     return (
@@ -276,8 +304,12 @@ export const ConnectivityStatus: React.FC<ConnectivityStatusProps> = ({
         <Cloud className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         <span>
           {language === "en"
-            ? "Internet connection alone does not guarantee that the displayed information is current. Check the last data sync and advisory validity before using the information for operational decisions."
-            : "Ang internet connection lamang ay hindi garantiya na kasalukuyan ang ipinapakitang impormasyon. Tingnan ang huling data sync at validity ng advisory bago ito gamitin sa operational decisions."}
+            ? audience === "public"
+              ? "Internet connection alone does not guarantee that the preparedness information is current. Check the last data sync and advisory validity, and confirm the latest LGU or barangay instructions when possible."
+              : "Internet connection alone does not guarantee that the displayed information is current. Check the last data sync and advisory validity before using the information for operational decisions."
+            : audience === "public"
+              ? "Ang internet connection lamang ay hindi garantiya na kasalukuyan ang preparedness information. Tingnan ang huling data sync at advisory validity, at kumpirmahin ang pinakabagong LGU o barangay instructions kung maaari."
+              : "Ang internet connection lamang ay hindi garantiya na kasalukuyan ang ipinapakitang impormasyon. Tingnan ang huling data sync at validity ng advisory bago ito gamitin sa operational decisions."}
         </span>
       </p>
     </section>

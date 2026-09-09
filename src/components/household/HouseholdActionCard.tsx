@@ -1,6 +1,6 @@
 "use client";
 
-import React, { FormEvent, useMemo, useRef, useState } from "react";
+import React, { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowRight,
   Baby,
@@ -54,6 +54,8 @@ export interface HouseholdCardOutput {
 export interface HouseholdActionCardProps {
   barangays: string[];
   initialBarangay?: string;
+  lockedBarangay?: string;
+  requireBarangaySelection?: boolean;
   output?: HouseholdCardOutput | null;
   isGenerating?: boolean;
   onGenerateByCode?: (householdCode: string) => void | Promise<void>;
@@ -67,6 +69,8 @@ const COMMUNICATION_OPTIONS = ["SMS", "Mobile Internet", "Radio", "Barangay Anno
 export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
   barangays,
   initialBarangay,
+  lockedBarangay,
+  requireBarangaySelection = false,
   output = null,
   isGenerating = false,
   onGenerateByCode,
@@ -78,8 +82,11 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
   const printableCardRef = useRef<HTMLDivElement>(null);
 
   const defaultBarangay = useMemo(
-    () => initialBarangay ?? barangays[0] ?? "",
-    [initialBarangay, barangays]
+    () =>
+      lockedBarangay ??
+      initialBarangay ??
+      (requireBarangaySelection ? "" : barangays[0] ?? ""),
+    [lockedBarangay, initialBarangay, requireBarangaySelection, barangays]
   );
 
   const [mode, setMode] = useState<HouseholdMode>("code");
@@ -94,6 +101,12 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
   const [housingCharacteristics, setHousingCharacteristics] = useState("");
   const [communicationMethods, setCommunicationMethods] = useState<string[]>([]);
   const [formError, setFormError] = useState("");
+
+  useEffect(() => {
+    if (lockedBarangay) {
+      setSelectedBarangay(lockedBarangay);
+    }
+  }, [lockedBarangay]);
 
   const toggleCommunicationMethod = (value: string) => {
     setCommunicationMethods((current) =>
@@ -438,25 +451,36 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
               </div>
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <label>
-                  <span className="text-xs font-bold text-slate-700">
-                    {language === "en" ? "Barangay" : "Barangay"}
-                  </span>
-                  <select
-                    value={selectedBarangay}
-                    onChange={(event) => setSelectedBarangay(event.target.value)}
-                    className="mt-2 min-h-[44px] w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                  >
-                    <option value="">
-                      {language === "en" ? "Select barangay" : "Pumili ng barangay"}
-                    </option>
-                    {barangays.map((barangay) => (
-                      <option key={barangay} value={barangay}>
-                        {barangay}
+                {lockedBarangay ? (
+                  <div>
+                    <span className="text-xs font-bold text-slate-700">
+                      {language === "en" ? "Barangay" : "Barangay"}
+                    </span>
+                    <div className="mt-2 flex min-h-[44px] items-center rounded-xl border border-blue-100 bg-blue-50/60 px-3.5 text-sm font-semibold text-blue-900">
+                      Barangay {lockedBarangay}
+                    </div>
+                  </div>
+                ) : (
+                  <label>
+                    <span className="text-xs font-bold text-slate-700">
+                      {language === "en" ? "Barangay" : "Barangay"}
+                    </span>
+                    <select
+                      value={selectedBarangay}
+                      onChange={(event) => setSelectedBarangay(event.target.value)}
+                      className="mt-2 min-h-[44px] w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                    >
+                      <option value="">
+                        {language === "en" ? "Select barangay" : "Pumili ng barangay"}
                       </option>
-                    ))}
-                  </select>
-                </label>
+                      {barangays.map((barangay) => (
+                        <option key={barangay} value={barangay}>
+                          {barangay}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
 
                 <label>
                   <span className="text-xs font-bold text-slate-700">
@@ -616,30 +640,45 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
                 </div>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">
                   {language === "en"
-                    ? "Choose your barangay to receive general preparedness guidance. This option does not ask for household details."
-                    : "Piliin ang inyong barangay upang makatanggap ng pangkalahatang preparedness guidance. Hindi humihingi ang option na ito ng household details."}
+                    ? lockedBarangay
+                      ? `General preparedness guidance for Barangay ${lockedBarangay}. This option does not ask for household details.`
+                      : "Choose your barangay to receive general preparedness guidance. This option does not ask for household details."
+                    : lockedBarangay
+                      ? `Pangkalahatang preparedness guidance para sa Barangay ${lockedBarangay}. Hindi humihingi ang option na ito ng household details.`
+                      : "Piliin ang inyong barangay upang makatanggap ng pangkalahatang preparedness guidance. Hindi humihingi ang option na ito ng household details."}
                 </p>
               </div>
 
-              <label className="block">
-                <span className="text-xs font-bold text-slate-700">
-                  {language === "en" ? "Barangay" : "Barangay"}
-                </span>
-                <select
-                  value={selectedBarangay}
-                  onChange={(event) => setSelectedBarangay(event.target.value)}
-                  className="mt-2 min-h-[44px] w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                >
-                  <option value="">
-                    {language === "en" ? "Select barangay" : "Pumili ng barangay"}
-                  </option>
-                  {barangays.map((barangay) => (
-                    <option key={barangay} value={barangay}>
-                      {barangay}
+              {lockedBarangay ? (
+                <div>
+                  <span className="text-xs font-bold text-slate-700">
+                    {language === "en" ? "Barangay" : "Barangay"}
+                  </span>
+                  <div className="mt-2 flex min-h-[44px] items-center rounded-xl border border-blue-100 bg-blue-50/60 px-3.5 text-sm font-semibold text-blue-900">
+                    Barangay {lockedBarangay}
+                  </div>
+                </div>
+              ) : (
+                <label className="block">
+                  <span className="text-xs font-bold text-slate-700">
+                    {language === "en" ? "Barangay" : "Barangay"}
+                  </span>
+                  <select
+                    value={selectedBarangay}
+                    onChange={(event) => setSelectedBarangay(event.target.value)}
+                    className="mt-2 min-h-[44px] w-full rounded-xl border border-slate-200 bg-white px-3.5 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="">
+                      {language === "en" ? "Select barangay" : "Pumili ng barangay"}
                     </option>
-                  ))}
-                </select>
-              </label>
+                    {barangays.map((barangay) => (
+                      <option key={barangay} value={barangay}>
+                        {barangay}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
               <button
                 type="submit"

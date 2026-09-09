@@ -2,46 +2,85 @@
 
 import React, { useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
-import { MOCK_USER } from "@/lib/mock-data";
-import { User, ShieldCheck, ChevronDown, Check, Building } from "lucide-react";
+import {
+  type DemoUserView,
+  useNavigation,
+} from "@/context/NavigationContext";
+import { ChevronDown, Check, Building } from "lucide-react";
 
 interface UserProfileAreaProps {
   compact?: boolean;
+  menuPlacement?: "top" | "bottom";
 }
 
-const AVAILABLE_ROLES = [
+interface DemoRole {
+  view: DemoUserView;
+  name: string;
+  roleEn: string;
+  roleFil: string;
+  assigned: string;
+  badgeEn: string;
+  badgeFil: string;
+}
+
+const AVAILABLE_ROLES: DemoRole[] = [
   {
-    name: MOCK_USER.name,
-    roleEn: MOCK_USER.roleEn,
-    roleFil: MOCK_USER.roleFil,
-    assigned: MOCK_USER.assignedLgu,
-    badgeEn: "Demo LGU View",
-    badgeFil: "Demo LGU View",
+    view: "lgu",
+    name: "Demo LGU User",
+    roleEn: "Authorized LGU User",
+    roleFil: "Awtorisadong LGU User",
+    assigned: "City EOC (Lucena City)",
+    badgeEn: "LGU",
+    badgeFil: "LGU",
   },
   {
-    name: "Demo Barangay User",
-    roleEn: "Barangay Official Placeholder",
-    roleFil: "Placeholder ng Barangay Official",
-    assigned: "Lucena City — Demo Barangay Context",
-    badgeEn: "Demo Barangay View",
-    badgeFil: "Demo Barangay View",
+    view: "barangay-gulang-gulang",
+    name: "Barangay Gulang-Gulang User",
+    roleEn: "Barangay Official",
+    roleFil: "Opisyal ng Barangay",
+    assigned: "Barangay Gulang-Gulang, Lucena City",
+    badgeEn: "Barangay",
+    badgeFil: "Barangay",
   },
   {
+    view: "public-resident",
+    name: "Public / Resident",
+    roleEn: "Household Preparedness Access",
+    roleFil: "Household Preparedness Access",
+    assigned: "Public Household Action Card",
+    badgeEn: "Public",
+    badgeFil: "Public",
+  },
+  {
+    view: "field-responder",
     name: "Demo Field Responder",
-    roleEn: "Field Responder Placeholder",
-    roleFil: "Placeholder ng Field Responder",
-    assigned: "Lucena City — Demo Field Context",
-    badgeEn: "Demo Field View",
-    badgeFil: "Demo Field View",
+    roleEn: "Field Responder",
+    roleFil: "Field Responder",
+    assigned: "Lucena City Field Operations",
+    badgeEn: "Responder",
+    badgeFil: "Responder",
   },
 ];
 
-export const UserProfileArea: React.FC<UserProfileAreaProps> = ({ compact = false }) => {
+export const UserProfileArea: React.FC<UserProfileAreaProps> = ({
+  compact = false,
+  menuPlacement,
+}) => {
   const { language } = useLanguage();
-  const [selectedRoleIndex, setSelectedRoleIndex] = useState(0);
+  const { userView, setUserView } = useNavigation();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
+  const selectedRoleIndex = Math.max(
+    0,
+    AVAILABLE_ROLES.findIndex((role) => role.view === userView)
+  );
   const currentUser = AVAILABLE_ROLES[selectedRoleIndex];
+  const resolvedMenuPlacement = menuPlacement ?? (compact ? "bottom" : "top");
+
+  const selectRole = (role: DemoRole) => {
+    setUserView(role.view);
+    setIsDropdownOpen(false);
+  };
 
   return (
     <div className="relative">
@@ -49,71 +88,70 @@ export const UserProfileArea: React.FC<UserProfileAreaProps> = ({ compact = fals
         <button
           type="button"
           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-100 transition-colors border border-transparent hover:border-slate-200"
+          className="flex items-center gap-2 rounded-lg border border-transparent p-1.5 transition-colors hover:border-slate-200 hover:bg-slate-100"
           aria-label="User Profile"
           aria-expanded={isDropdownOpen}
         >
-          <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs border border-blue-200">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-blue-100 text-xs font-bold text-blue-700">
             {currentUser.name
               .split(" ")
-              .map((n) => n[0])
+              .map((name) => name[0])
               .join("")
               .slice(0, 2)}
           </div>
         </button>
       ) : (
-        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-slate-300 transition-all">
+        <div className="rounded-xl border border-slate-200 bg-slate-50 p-2.5 transition-all hover:border-slate-300">
           <div className="flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className="flex items-center gap-2.5 text-left flex-1 min-w-0 group"
+              className="group flex min-w-0 flex-1 items-center gap-2.5 text-left"
               aria-expanded={isDropdownOpen}
             >
               <div className="relative shrink-0">
-                <div className="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-600 text-xs font-bold text-white shadow-xs">
                   {currentUser.name
                     .split(" ")
-                    .map((n) => n[0])
+                    .map((name) => name[0])
                     .join("")
                     .slice(0, 2)}
                 </div>
                 <span
-                  className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-slate-400 ring-2 ring-white"
-                  title={language === "en" ? "Demo role selected" : "Napiling demo role"}
+                  className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 ring-2 ring-white"
+                  title="Active / On Duty"
                 />
               </div>
 
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-bold text-slate-900 truncate group-hover:text-blue-700 transition-colors">
+                <p className="truncate text-xs font-bold text-slate-900 transition-colors group-hover:text-blue-700">
                   {currentUser.name}
                 </p>
-                <p className="text-[11px] text-slate-500 truncate">
+                <p className="truncate text-[11px] text-slate-500">
                   {language === "en" ? currentUser.roleEn : currentUser.roleFil}
                 </p>
               </div>
 
               <ChevronDown
-                className={`w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-transform ${
+                className={`h-4 w-4 text-slate-400 transition-transform group-hover:text-slate-600 ${
                   isDropdownOpen ? "rotate-180" : ""
                 }`}
               />
             </button>
           </div>
 
-          <div className="mt-2 pt-2 border-t border-slate-200/80 flex items-center justify-between text-[11px] text-slate-500">
-            <span className="inline-flex items-center gap-1 font-medium text-slate-600 truncate max-w-[150px]">
-              <Building className="w-3 h-3 text-slate-400 shrink-0" />
+          <div className="mt-2 flex items-center justify-between border-t border-slate-200/80 pt-2 text-[11px] text-slate-500">
+            <span className="inline-flex max-w-[150px] items-center gap-1 truncate font-medium text-slate-600">
+              <Building className="h-3 w-3 shrink-0 text-slate-400" />
               <span className="truncate">{currentUser.assigned}</span>
             </span>
-            <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+            <span className="rounded border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
               {language === "en" ? currentUser.badgeEn : currentUser.badgeFil}
             </span>
           </div>
         </div>
       )}
 
-      {/* Role Switcher Menu */}
       {isDropdownOpen && (
         <>
           <div
@@ -121,43 +159,49 @@ export const UserProfileArea: React.FC<UserProfileAreaProps> = ({ compact = fals
             onClick={() => setIsDropdownOpen(false)}
             aria-hidden="true"
           />
-          <div className="absolute bottom-full left-0 mb-2 w-72 bg-white rounded-xl shadow-xl border border-slate-200 z-50 p-2 animate-in fade-in zoom-in-95 duration-150">
-            <div className="px-3 py-2 border-b border-slate-100">
+          <div
+            className={`absolute left-0 z-50 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-xl animate-in fade-in zoom-in-95 duration-150 ${
+              resolvedMenuPlacement === "bottom" ? "top-full mt-2" : "bottom-full mb-2"
+            }`}
+          >
+            <div className="border-b border-slate-100 px-3 py-2">
               <p className="text-xs font-bold text-slate-900">
-                {language === "en" ? "Demo User Role" : "Demo User Role"}
+                {language === "en" ? "Simulate User View" : "Subukan ang User View"}
               </p>
               <p className="text-[11px] text-slate-500">
                 {language === "en"
-                  ? "Preview frontend layouts using synthetic roles only"
-                  : "I-preview ang frontend layouts gamit lamang ang synthetic demo roles"}
+                  ? "Switch between the demo access views"
+                  : "Lumipat sa iba't ibang demo access view"}
               </p>
             </div>
 
-            <div className="py-1 space-y-1">
-              {AVAILABLE_ROLES.map((role, idx) => {
-                const isSelected = idx === selectedRoleIndex;
+            <div className="space-y-1 py-1">
+              {AVAILABLE_ROLES.map((role) => {
+                const isSelected = role.view === userView;
+
                 return (
                   <button
-                    key={idx}
+                    key={role.view}
                     type="button"
-                    onClick={() => {
-                      setSelectedRoleIndex(idx);
-                      setIsDropdownOpen(false);
-                    }}
-                    className={`w-full text-left p-2.5 rounded-lg text-xs transition-colors flex items-start justify-between gap-2 ${
+                    onClick={() => selectRole(role)}
+                    className={`flex w-full items-start justify-between gap-2 rounded-lg p-2.5 text-left text-xs transition-colors ${
                       isSelected
-                        ? "bg-blue-50 text-blue-900 font-medium"
-                        : "hover:bg-slate-50 text-slate-700"
+                        ? "bg-blue-50 font-medium text-blue-900"
+                        : "text-slate-700 hover:bg-slate-50"
                     }`}
                   >
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-bold text-slate-900">{role.name}</p>
-                      <p className="text-slate-500 text-[11px]">
+                      <p className="text-[11px] text-slate-500">
                         {language === "en" ? role.roleEn : role.roleFil}
                       </p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">{role.assigned}</p>
+                      <p className="mt-0.5 truncate text-[10px] text-slate-400">
+                        {role.assigned}
+                      </p>
                     </div>
-                    {isSelected && <Check className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />}
+                    {isSelected && (
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
+                    )}
                   </button>
                 );
               })}
