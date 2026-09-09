@@ -8,10 +8,45 @@ export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return body.data as T;
 }
 
+function advisoryPayload(values: AdvisoryFormValues, evidence?: unknown) {
+  const issueTime = new Date(values.issuedTime);
+  const validityEnd = new Date(values.validity);
+  if (Number.isNaN(issueTime.valueOf()) || Number.isNaN(validityEnd.valueOf())) {
+    throw new Error("Issued time and validity must be valid dates.");
+  }
+  return {
+    sourceAgency: values.source,
+    advisoryType: values.title,
+    bulletinReference: values.bulletinNumber,
+    warningInformation: values.warningInformation,
+    message: values.message,
+    precautions: values.precautions,
+    issueTime: issueTime.toISOString(),
+    validityStart: issueTime.toISOString(),
+    validityEnd: validityEnd.toISOString(),
+    sourceCoverageLevel: values.coverageLevel,
+    sourceAffectedAreas: values.affectedLocations.split(",").map(x => x.trim()).filter(Boolean),
+    sourceLink: values.sourceUrl,
+    ...(evidence !== undefined ? { evidence } : {}),
+  };
+}
+
 export function saveAdvisory(values: AdvisoryFormValues, evidence?: unknown) {
-  const issueTime = new Date(values.issuedTime); const validityEnd = new Date(values.validity);
-  if (Number.isNaN(issueTime.valueOf()) || Number.isNaN(validityEnd.valueOf())) throw new Error("Issued time and validity must be valid dates.");
-  return api("/api/advisories", { method: "POST", body: JSON.stringify({ sourceAgency: values.source, advisoryType: values.title, bulletinReference: values.bulletinNumber, warningInformation: [values.warningInformation, values.message, ...values.precautions].filter(Boolean).join("\n"), issueTime: issueTime.toISOString(), validityStart: issueTime.toISOString(), validityEnd: validityEnd.toISOString(), sourceCoverageLevel: values.coverageLevel, sourceAffectedAreas: values.affectedLocations.split(",").map(x => x.trim()).filter(Boolean), sourceLink: values.sourceUrl, evidence }) });
+  return api("/api/advisories", {
+    method: "POST",
+    body: JSON.stringify(advisoryPayload(values, evidence)),
+  });
+}
+
+export function updateAdvisory(id: string, values: AdvisoryFormValues, evidence?: unknown) {
+  return api(`/api/advisories/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(advisoryPayload(values, evidence)),
+  });
+}
+
+export function deleteAdvisory(id: string) {
+  return api(`/api/advisories/${id}`, { method: "DELETE" });
 }
 
 export function householdCardByCode(householdCode: string, language: "en" | "fil") {

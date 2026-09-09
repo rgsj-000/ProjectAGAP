@@ -10,9 +10,23 @@ import { cacheOfflinePack, readOfflinePack } from "@/lib/client/offlineQueue";
 import { generateHouseholdCard } from "@/lib/domain/actionCards";
 import { ConnectivityStatus } from "@/components/feedback/ConnectivityStatus";
 
+type PublicAdvisory = {
+  id: string;
+  sourceAgency: string;
+  advisoryType: string;
+  bulletinReference: string;
+  warningInformation: string;
+  issueTime: string;
+  validityEnd: string;
+  affectedAreas: string[];
+  sourceLink: string;
+  verificationStatus: "VERIFIED";
+};
+
 export function ConnectedHouseholdCard() {
   const { language } = useLanguage();
   const [barangays, setBarangays] = useState<string[]>([]);
+  const [currentAdvisories, setCurrentAdvisories] = useState<PublicAdvisory[]>([]);
   const [output, setOutput] = useState<HouseholdCardOutput | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -28,13 +42,24 @@ export function ConnectedHouseholdCard() {
     window.addEventListener("offline", update);
     void (async () => {
       try {
-        const names = await api<string[]>("/api/public/preparedness");
+        const [names, advisories] = await Promise.all([
+          api<string[]>("/api/public/preparedness"),
+          api<PublicAdvisory[]>("/api/public/advisories"),
+        ]);
         setBarangays(names);
-        await cacheOfflinePack("public:barangays", names);
+        setCurrentAdvisories(advisories);
+        await Promise.all([
+          cacheOfflinePack("public:barangays", names),
+          cacheOfflinePack("public:advisories", advisories),
+        ]);
       } catch (e) {
-        const cached = await readOfflinePack<string[]>("public:barangays").catch(() => undefined);
-        if (cached) setBarangays(cached.data);
-        else
+        const [cachedBarangays, cachedAdvisories] = await Promise.all([
+          readOfflinePack<string[]>("public:barangays").catch(() => undefined),
+          readOfflinePack<PublicAdvisory[]>("public:advisories").catch(() => undefined),
+        ]);
+        if (cachedBarangays) setBarangays(cachedBarangays.data);
+        if (cachedAdvisories) setCurrentAdvisories(cachedAdvisories.data);
+        if (!cachedBarangays)
           setError(
             navigator.onLine
               ? "Household data is temporarily unavailable. Please try again later or contact your barangay."
@@ -140,6 +165,54 @@ export function ConnectedHouseholdCard() {
         >
           {error}
         </p>
+      )}
+      {currentAdvisories.length > 0 ? (
+        <section className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4 sm:p-5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+                Current verified advisory
+              </p>
+              <p className="mt-1 text-sm text-emerald-950">
+                Household cards use the newest verified advisory that applies to the selected barangay.
+              </p>
+            </div>
+            <span className="rounded-full border border-emerald-300 bg-white px-3 py-1 text-xs font-bold text-emerald-800">
+              VERIFIED
+            </span>
+          </div>
+          <div className="mt-3 space-y-3">
+            {currentAdvisories.slice(0, 3).map((advisory) => (
+              <article key={advisory.id} className="rounded-xl border border-emerald-200 bg-white p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="font-bold text-slate-950">
+                      {advisory.advisoryType} · {advisory.bulletinReference}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-600">
+                      {advisory.sourceAgency} · Valid until {new Date(advisory.validityEnd).toLocaleString("en-PH")}
+                    </p>
+                  </div>
+                  <a
+                    href={advisory.sourceLink}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-semibold text-blue-700 underline"
+                  >
+                    Official source
+                  </a>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-slate-700">
+                  Applies to {advisory.affectedAreas.length} Lucena City barangay(s).
+                </p>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+          No current verified advisory is available yet. Household cards will become available after an authorized LGU reviewer verifies a valid advisory for the barangay.
+        </section>
       )}
       <HouseholdActionCard
         barangays={barangays}
