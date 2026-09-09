@@ -4,7 +4,7 @@ import React, { FormEvent, useMemo, useRef, useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import HelpTooltip from "@/components/ui/HelpTooltip";
 import { getHelpContent, type HelpContentDefinition } from "@/lib/help-content";
-import { AlertCircle, FileText, Image as ImageIcon, Plus, ShieldCheck, Trash2, UploadCloud } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileText, Image as ImageIcon, LoaderCircle, Plus, ShieldCheck, Sparkles, Trash2, UploadCloud } from "lucide-react";
 
 export interface AdvisoryFormValues {
   title: string;
@@ -94,6 +94,11 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionError, setExtractionError] = useState("");
+  const [extractionWarnings, setExtractionWarnings] = useState<string[]>([]);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [extractedFieldCount, setExtractedFieldCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const copy = useMemo(
@@ -150,6 +155,14 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             fileReady: "Ready to upload when the advisory is saved",
             fileTooLarge: "File is larger than the 6 MB limit.",
             fileTypeInvalid: "Use a PDF, PNG, JPG, or JPEG file.",
+            extracting: "AI is reading the advisory and preparing the form…",
+            extractionReady: "AI extraction complete",
+            extractionReadyBody:
+              "Review every extracted field before saving. Missing or uncertain information still requires human validation.",
+            extractedFieldsLabel: "fields extracted",
+            missingLabel: "Needs validation",
+            extractionFailed:
+              "AI extraction could not complete. You can still fill the form manually.",
           }
         : {
             eyebrow: "Official advisory input",
@@ -202,6 +215,14 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             fileReady: "Handa nang i-upload kapag sine-save ang advisory",
             fileTooLarge: "Lumampas ang file sa 6 MB limit.",
             fileTypeInvalid: "Gumamit ng PDF, PNG, JPG, o JPEG file.",
+            extracting: "Binabasa ng AI ang advisory at inihahanda ang form…",
+            extractionReady: "Tapos na ang AI extraction",
+            extractionReadyBody:
+              "Suriin ang bawat extracted field bago i-save. Ang kulang o hindi tiyak na impormasyon ay kailangan pa ring beripikahin ng tao.",
+            extractedFieldsLabel: "fields na nakuha",
+            missingLabel: "Kailangang beripikahin",
+            extractionFailed:
+              "Hindi natapos ang AI extraction. Maaari mo pa ring punan nang mano-mano ang form.",
           },
     [language]
   );
@@ -218,11 +239,82 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
   const clearSourceFile = () => {
     setSourceFile(null);
     setFileError("");
+    setExtractionError("");
+    setExtractionWarnings([]);
+    setMissingFields([]);
+    setExtractedFieldCount(0);
     setLocalSuccess(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
     onFileChange?.(null);
+  };
+
+  const extractSourceFile = async (file: File) => {
+    setIsExtracting(true);
+    setExtractionError("");
+    setExtractionWarnings([]);
+    setMissingFields([]);
+    setExtractedFieldCount(0);
+    setLocalSuccess(false);
+
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const response = await fetch("/api/advisories/extract", {
+        method: "POST",
+        body: form,
+      });
+      const body = await response.json();
+      if (!response.ok || !body.success) {
+        throw new Error(body.error?.message ?? copy.extractionFailed);
+      }
+
+      const result = body.data as {
+        fields: {
+          title: string | null;
+          source: string | null;
+          issuedTime: string | null;
+          bulletinNumber: string | null;
+          validity: string | null;
+          affectedLocations: string[];
+          warningInformation: string | null;
+          sourceUrl: string | null;
+          message: string | null;
+          precautions: string[];
+        };
+        extractedFields: string[];
+        missingFields: string[];
+        warnings: string[];
+      };
+
+      setValues((current) => ({
+        ...current,
+        title: result.fields.title ?? "",
+        source: result.fields.source ?? "",
+        issuedTime: result.fields.issuedTime ?? "",
+        bulletinNumber: result.fields.bulletinNumber ?? "",
+        validity: result.fields.validity ?? "",
+        affectedLocations: result.fields.affectedLocations.join(", "),
+        warningInformation: result.fields.warningInformation ?? "",
+        sourceUrl: result.fields.sourceUrl ?? "",
+        message: result.fields.message ?? "",
+        precautions:
+          result.fields.precautions.length > 0
+            ? result.fields.precautions
+            : [""],
+      }));
+      setErrors({});
+      setExtractionWarnings(result.warnings);
+      setMissingFields(result.missingFields);
+      setExtractedFieldCount(result.extractedFields.length);
+    } catch (error) {
+      setExtractionError(
+        error instanceof Error ? error.message : copy.extractionFailed,
+      );
+    } finally {
+      setIsExtracting(false);
+    }
   };
 
   const selectSourceFile = (file: File | null) => {
@@ -251,8 +343,10 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
 
     setSourceFile(file);
     setFileError("");
+    setExtractionError("");
     setLocalSuccess(false);
     onFileChange?.(file);
+    void extractSourceFile(file);
   };
 
   const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -507,6 +601,75 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             {fileError}
           </p>
         ) : null}
+
+        {sourceFile && isExtracting && (
+          <div
+            role="status"
+            className="mt-4 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-900"
+          >
+            <LoaderCircle
+              className="mt-0.5 h-4 w-4 shrink-0 animate-spin"
+              aria-hidden="true"
+            />
+            <div>
+              <p className="text-xs font-bold">{copy.extracting}</p>
+              <p className="mt-1 text-[11px] leading-5 text-blue-800">
+                {language === "en"
+                  ? "The form remains editable. AI only extracts information supported by the uploaded source."
+                  : "Mananatiling editable ang form. Ang AI ay kukuha lamang ng impormasyong suportado ng uploaded source."}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {sourceFile && !isExtracting && extractedFieldCount > 0 && (
+          <div
+            role="status"
+            className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4"
+          >
+            <div className="flex items-start gap-3">
+              <CheckCircle2
+                className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700"
+                aria-hidden="true"
+              />
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-emerald-900">
+                  {copy.extractionReady} · {extractedFieldCount}{" "}
+                  {copy.extractedFieldsLabel}
+                </p>
+                <p className="mt-1 text-[11px] leading-5 text-emerald-800">
+                  {copy.extractionReadyBody}
+                </p>
+              </div>
+            </div>
+
+            {missingFields.length > 0 && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-white/70 p-3">
+                <p className="flex items-center gap-1.5 text-[11px] font-bold text-amber-900">
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                  {copy.missingLabel}: {missingFields.join(", ")}
+                </p>
+              </div>
+            )}
+
+            {extractionWarnings.length > 0 && (
+              <ul className="mt-3 space-y-1 text-[11px] leading-5 text-slate-700">
+                {extractionWarnings.map((warning, index) => (
+                  <li key={index}>• {warning}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {sourceFile && !isExtracting && extractionError && (
+          <p
+            role="alert"
+            className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800"
+          >
+            {extractionError}
+          </p>
+        )}
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
