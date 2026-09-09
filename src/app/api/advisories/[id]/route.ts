@@ -58,6 +58,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       affected_areas: applicableBarangays,
       raw_content: {
         ...rawContent,
+        evidence:
+          value.evidence !== undefined
+            ? value.evidence
+            : rawContent.evidence ?? null,
         sourceCoverage: {
           level: sourceCoverageLevel,
           areas: sourceAffectedAreas,
