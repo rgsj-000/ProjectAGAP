@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useMemo, useRef } from "react";
 import {
   AlertTriangle,
   Building2,
@@ -44,6 +44,12 @@ export interface LGUActionRecommendation {
   status: LGUActionStatus | null;
 }
 
+export interface LGUCriticalFacility {
+  name: string;
+  operationalStatus: string | null;
+  capacity: string | null;
+}
+
 export interface LGUActionCardProps {
   barangayName: string;
   hazard: string | null;
@@ -60,6 +66,7 @@ export interface LGUActionCardProps {
     likelihood: string | null;
     severity: string | null;
     riskResult: string | null;
+    riskCategory?: string | null;
     relativeVulnerability: number | null;
     methodology: string | null;
     assessmentDate: string | null;
@@ -81,6 +88,7 @@ export interface LGUActionCardProps {
     recordedCapacity: string | null;
     potentialCapacityGap: string | null;
     criticalFacilityReadiness: string | null;
+    criticalFacilities?: LGUCriticalFacility[];
     communicationCapability: string | null;
   } | null;
 
@@ -125,6 +133,116 @@ function display(value: string | number | null | undefined) {
   return String(value);
 }
 
+function formatNumber(value: string | number | null | undefined) {
+  if (value === null || value === undefined || value === "") return EMPTY;
+  const parsed = Number(value);
+  return Number.isFinite(parsed)
+    ? new Intl.NumberFormat("en-PH", { maximumFractionDigits: 2 }).format(parsed)
+    : String(value);
+}
+
+function formatDateTime(
+  value: string | null | undefined,
+  language: "en" | "fil",
+) {
+  if (!value) return EMPTY;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(language === "en" ? "en-PH" : "fil-PH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Manila",
+  }).format(date);
+}
+
+function humanizeKey(value: string) {
+  return value
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replaceAll("_", " ")
+    .replaceAll("-", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function humanizeToken(value: unknown): string {
+  if (value === null || value === undefined || value === "") return EMPTY;
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return formatNumber(value);
+  if (Array.isArray(value)) return value.map(humanizeToken).join(", ");
+  if (typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, item]) => `${humanizeKey(key)}: ${humanizeToken(item)}`)
+      .join(" · ");
+  }
+  return String(value)
+    .replaceAll("_", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function parseJson(value: string | null | undefined): unknown {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function friendlyMethod(value: string | null | undefined) {
+  if (!value) return EMPTY;
+  const methods: Record<string, string> = {
+    INHABITED_AREA_PROPORTIONAL_FALLBACK: "Inhabited area proportion estimate",
+    POPULATION_GRID_INTERSECTION: "Population grid intersection",
+    RESIDENTIAL_BUILDING_ESTIMATE: "Residential building estimate",
+  };
+  return methods[value] ?? humanizeToken(value);
+}
+
+function friendlyConfidence(value: string | null | undefined) {
+  if (!value) return EMPTY;
+  const normalized = value.toUpperCase();
+  if (normalized === "LOW") return "Low confidence";
+  if (normalized === "MEDIUM") return "Medium confidence";
+  if (normalized === "HIGH") return "High confidence";
+  return humanizeToken(value);
+}
+
+function friendlyTrigger(value: string | null | undefined) {
+  if (!value) return EMPTY;
+  const normalized = value.trim();
+  if (/^riskCategory\s+IN\s+\["HIGH","VERY_HIGH"\]$/i.test(normalized)) {
+    return "Risk category is High or Very High";
+  }
+  if (/^capacityGap\s+GT\s+0$/i.test(normalized)) {
+    return "Potential capacity gap is greater than 0";
+  }
+  return normalized
+    .replace(/riskCategory/gi, "Risk category")
+    .replace(/capacityGap/gi, "Potential capacity gap")
+    .replace(/\s+GT\s+/gi, " is greater than ")
+    .replace(/\s+GTE\s+/gi, " is at least ")
+    .replace(/\s+LT\s+/gi, " is less than ")
+    .replace(/\s+EQ\s+/gi, " is ")
+    .replaceAll("_", " ");
+}
+
+function friendlyEvidence(value: string | null | undefined) {
+  if (!value) return EMPTY;
+  const parsed = parseJson(value);
+  if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+    const record = parsed as Record<string, unknown>;
+    if ("field" in record && "value" in record) {
+      return `${humanizeKey(String(record.field))}: ${humanizeToken(record.value)}`;
+    }
+    return humanizeToken(record);
+  }
+  return value;
+}
+
+function ruleId(value: string | null | undefined) {
+  if (!value) return EMPTY;
+  return value.split(" · ")[0]?.trim() || value;
+}
+
 function StateBadge({
   state,
   language,
@@ -161,7 +279,7 @@ function Field({
   helpAlign?: "left" | "center" | "right";
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
+    <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
       <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
         <span>{label}</span>
         {helpContent ? (
@@ -172,9 +290,39 @@ function Field({
           />
         ) : null}
       </span>
-      <span className="mt-1 block text-sm font-semibold text-slate-900">
+      <span className="mt-1 block break-words text-sm font-semibold leading-relaxed text-slate-900">
         {display(value)}
       </span>
+    </div>
+  );
+}
+
+function SummaryMetric({
+  label,
+  value,
+  supportingText,
+  emphasis = false,
+}: {
+  label: string;
+  value: string;
+  supportingText?: string;
+  emphasis?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-xl border p-4 ${emphasis ? "border-amber-200 bg-amber-50" : "border-slate-200 bg-white"}`}
+    >
+      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+        {label}
+      </p>
+      <p className="mt-1 text-xl font-black tracking-tight text-slate-950">
+        {value}
+      </p>
+      {supportingText ? (
+        <p className="mt-1 text-xs leading-relaxed text-slate-600">
+          {supportingText}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -201,6 +349,25 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
 }) => {
   const { language } = useLanguage();
   const cardRef = useRef<HTMLDivElement>(null);
+
+  const vulnerableGroups = useMemo(() => {
+    const parsed = parseJson(exposure?.vulnerableGroups);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return [];
+    return Object.entries(parsed as Record<string, unknown>).map(([key, value]) => ({
+      label: humanizeKey(key),
+      value: humanizeToken(value),
+    }));
+  }, [exposure?.vulnerableGroups]);
+
+  const communicationMethods = useMemo(() => {
+    const parsed = parseJson(capacity?.communicationCapability);
+    if (Array.isArray(parsed)) return parsed.map((item) => String(item));
+    if (!capacity?.communicationCapability) return [];
+    return capacity.communicationCapability
+      .split(/[,;]/)
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }, [capacity?.communicationCapability]);
 
   const printCard = () => {
     if (!cardRef.current || typeof window === "undefined") return;
@@ -297,13 +464,18 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
     },
   ];
 
+  const riskCategory = humanizeToken(assessment?.riskCategory || "For review");
+  const riskScore = formatNumber(assessment?.riskResult);
+  const recordedCapacity = formatNumber(capacity?.recordedCapacity);
+  const capacityGap = formatNumber(capacity?.potentialCapacityGap);
+  const facilities = capacity?.criticalFacilities ?? [];
+
   return (
     <div className={className}>
       <div
         ref={cardRef}
         className="agap-print-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
       >
-        {/* Situation Header */}
         <div className="border-b border-slate-200 bg-slate-50/70 p-5 sm:p-6">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -311,12 +483,21 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
                 Project AGAP
               </span>
               <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
-                {language === "en" ? "LGU Action Card" : "LGU Action Card"}
+                LGU Action Card
               </h1>
-              <p className="mt-1 text-sm text-slate-500">
+              <p className="mt-1 text-sm font-medium text-slate-600">
                 Barangay {barangayName}
-                {hazard ? ` • ${hazard}` : ""}
+                {hazard ? ` · ${hazard}` : ""}
               </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-black uppercase tracking-wider text-amber-800">
+                  {riskCategory} Risk
+                </span>
+                <StateBadge
+                  state={assessment?.verificationState ?? "UNVERIFIED"}
+                  language={language}
+                />
+              </div>
             </div>
 
             <div className="agap-print-hide flex flex-wrap gap-2">
@@ -332,353 +513,45 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
           </div>
 
           <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <Field
-              label={language === "en" ? "Current Advisory" : "Kasalukuyang Advisory"}
-              value={advisory?.title}
-              helpContent={getHelpContent("currentAdvisory", language)}
+            <SummaryMetric
+              label={language === "en" ? "Risk Assessment" : "Risk Assessment"}
+              value={`${riskCategory} · ${riskScore}`}
+              supportingText={
+                assessment?.likelihood && assessment?.severity
+                  ? `Likelihood ${assessment.likelihood} × Severity ${assessment.severity}`
+                  : undefined
+              }
+              emphasis
             />
-            <Field
-              label={language === "en" ? "Risk Result" : "Resulta ng Panganib"}
-              value={assessment?.riskResult}
-              helpContent={getHelpContent("riskResult", language)}
-              helpAlign="center"
+            <SummaryMetric
+              label={language === "en" ? "Potential Exposure" : "Posibleng Exposure"}
+              value={`${formatNumber(exposure?.estimatedPersons)} people`}
+              supportingText={
+                exposure?.estimatedHouseholds
+                  ? `About ${formatNumber(exposure.estimatedHouseholds)} households`
+                  : undefined
+              }
             />
-            <Field
-              label={language === "en" ? "Assessment Date" : "Petsa ng Pagtatasa"}
-              value={assessment?.assessmentDate}
+            <SummaryMetric
+              label={language === "en" ? "Validated Shelter Capacity" : "Validated Shelter Capacity"}
+              value={`${recordedCapacity} people`}
+              supportingText="Recorded evacuation and temporary shelter capacity"
             />
-            <div className="rounded-xl border border-slate-200 bg-white p-3.5">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {language === "en" ? "Verification Status" : "Verification Status"}
-                </span>
-                <HelpTooltip
-                  content={getHelpContent("assessmentVerificationStatus", language)}
-                  align="right"
-                  className="agap-print-hide"
-                />
-              </div>
-              <div className="mt-1.5">
-                <StateBadge
-                  state={assessment?.verificationState ?? "UNVERIFIED"}
-                  language={language}
-                />
-              </div>
-            </div>
+            <SummaryMetric
+              label={language === "en" ? "Potential Capacity Gap" : "Posibleng Capacity Gap"}
+              value={`${capacityGap} people`}
+              supportingText="Requires LGU validation before operational use"
+              emphasis={Number(capacity?.potentialCapacityGap) > 0}
+            />
           </div>
         </div>
 
-        <div className="space-y-6 p-5 sm:p-6">
-          {/* Verified Advisory */}
-          <section aria-labelledby="lgu-card-advisory">
-            <div className="mb-3 flex items-center gap-2">
-              <Radio className="h-4 w-4 text-blue-600" aria-hidden="true" />
-              <h2 id="lgu-card-advisory" className="text-sm font-bold text-slate-900">
-                {language === "en" ? "Official Advisory Information" : "Impormasyon ng Opisyal na Advisory"}
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field
-                label={language === "en" ? "Advisory / Bulletin" : "Babala / Bulletin"}
-                value={advisory?.reference}
-              />
-              <Field
-                label={language === "en" ? "Issued / Updated" : "Inilabas / In-update"}
-                value={advisory?.issuedAt}
-              />
-              <Field
-                label={language === "en" ? "Advisory Valid Until" : "Balido ang Advisory Hanggang"}
-                value={advisory?.validity}
-                helpContent={getHelpContent("advisoryValidUntil", language)}
-              />
-              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {language === "en" ? "Advisory Status" : "Advisory Status"}
-                  </span>
-                  <HelpTooltip
-                    content={getHelpContent("advisoryVerificationStatus", language)}
-                    align="right"
-                    className="agap-print-hide"
-                  />
-                </div>
-                <div className="mt-1.5">
-                  <StateBadge
-                    state={advisory?.verificationState ?? "UNVERIFIED"}
-                    language={language}
-                  />
-                </div>
-              </div>
-            </div>
-          </section>
-
-          {/* Deterministic Assessment */}
-          <section aria-labelledby="lgu-card-assessment">
-            <div className="mb-3 flex items-center gap-2">
-              <ShieldCheck className="h-4 w-4 text-blue-600" aria-hidden="true" />
-              <h2 id="lgu-card-assessment" className="text-sm font-bold text-slate-900">
-                {language === "en"
-                  ? "DRRM Risk Assessment"
-                  : "DRRM Risk Assessment"}
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-              <Field
-                label={
-                  language === "en"
-                    ? "Likelihood of Occurrence"
-                    : "Likelihood of Occurrence"
-                }
-                value={assessment?.likelihood}
-                helpContent={getHelpContent("likelihood", language)}
-              />
-              <Field
-                label={
-                  language === "en"
-                    ? "Severity of Consequence"
-                    : "Severity of Consequence"
-                }
-                value={assessment?.severity}
-                helpContent={getHelpContent("severity", language)}
-              />
-              <Field
-                label={language === "en" ? "Risk Result" : "Resulta ng Panganib"}
-                value={assessment?.riskResult}
-                helpContent={getHelpContent("riskResult", language)}
-                helpAlign="center"
-              />
-              <Field
-                label={
-                  language === "en"
-                    ? "Relative Vulnerability"
-                    : "Relative Vulnerability"
-                }
-                value={assessment?.relativeVulnerability}
-                helpContent={getHelpContent("relativeVulnerability", language)}
-                helpAlign="right"
-              />
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Field
-                label={
-                  language === "en"
-                    ? "Assessment Methodology"
-                    : "Assessment Methodology"
-                }
-                value={assessment?.methodology}
-                helpContent={getHelpContent("methodology", language)}
-              />
-              <Field
-                label={language === "en" ? "Assessment Date" : "Petsa ng Pagtatasa"}
-                value={assessment?.assessmentDate}
-              />
-            </div>
-
-            <p className="mt-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-xs leading-relaxed text-blue-900">
-              {language === "en"
-                ? "Risk follows the documented DRRM method and verified inputs. AI may explain the result but cannot change the calculation."
-                : "Ang risk ay sumusunod sa documented DRRM method at verified inputs. Maaaring ipaliwanag ng AI ang result ngunit hindi nito mababago ang calculation."}
-            </p>
-          </section>
-
-          {/* Population Exposure */}
-          <section aria-labelledby="lgu-card-exposure">
-            <div className="mb-3 flex items-center gap-2">
-              <Users className="h-4 w-4 text-blue-600" aria-hidden="true" />
-              <h2 id="lgu-card-exposure" className="text-sm font-bold text-slate-900">
-                {language === "en"
-                  ? "Estimated Potentially Exposed Population"
-                  : "Tinatayang Populasyong Posibleng Malantad"}
-              </h2>
-              <HelpTooltip
-                content={getHelpContent("potentiallyExposedPopulation", language)}
-                align="left"
-                className="agap-print-hide"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Field
-                label={
-                  language === "en"
-                    ? "Estimated Potentially Exposed Persons"
-                    : "Tinatayang Posibleng Malantad na Tao"
-                }
-                value={exposure?.estimatedPersons}
-                helpContent={getHelpContent("potentiallyExposedPopulation", language)}
-              />
-              <Field
-                label={language === "en" ? "Estimated Exposed Households" : "Tinatayang Exposed Households"}
-                value={exposure?.estimatedHouseholds}
-                helpContent={getHelpContent("estimatedExposedHouseholds", language)}
-                helpAlign="center"
-              />
-              <Field
-                label={language === "en" ? "Estimated Vulnerable Groups" : "Tinatayang Vulnerable Groups"}
-                value={exposure?.vulnerableGroups}
-                helpContent={getHelpContent("estimatedVulnerableGroups", language)}
-                helpAlign="right"
-              />
-            </div>
-
-            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Field
-                label={language === "en" ? "Estimation Method" : "Paraan ng Pagtatantiya"}
-                value={exposure?.estimationMethod}
-                helpContent={getHelpContent("exposureEstimationMethod", language)}
-              />
-              <Field
-                label={language === "en" ? "Confidence Level" : "Confidence Level"}
-                value={exposure?.confidenceLevel}
-                helpContent={getHelpContent("confidenceLevel", language)}
-                helpAlign="center"
-              />
-              <Field
-                label={language === "en" ? "Source" : "Pinagmulan"}
-                value={exposure?.source}
-              />
-              <Field
-                label={language === "en" ? "Data Reference Date" : "Petsa ng Reference Data"}
-                value={exposure?.referenceDate}
-              />
-            </div>
-          </section>
-
-          {/* Preparedness Capacity */}
-          <section aria-labelledby="lgu-card-capacity">
-            <div className="mb-3 flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-blue-600" aria-hidden="true" />
-              <h2 id="lgu-card-capacity" className="text-sm font-bold text-slate-900">
-                {language === "en" ? "Evacuation Capacity" : "Kapasidad sa Paghahanda"}
-              </h2>
-              <HelpTooltip
-                content={getHelpContent("preparednessCapacity", language)}
-                align="left"
-                className="agap-print-hide"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Field
-                label={
-                  language === "en"
-                    ? "Validated Evacuation / Temporary-Shelter Capacity"
-                    : "Validated Evacuation / Temporary-Shelter Capacity"
-                }
-                value={capacity?.recordedCapacity}
-                helpContent={getHelpContent("validatedShelterCapacity", language)}
-              />
-              <Field
-                label={language === "en" ? "Potential Capacity Gap" : "Posibleng Capacity Gap"}
-                value={capacity?.potentialCapacityGap}
-                helpContent={getHelpContent("potentialCapacityGap", language)}
-                helpAlign="center"
-              />
-              <Field
-                label={
-                  language === "en"
-                    ? "Critical Facilities Readiness"
-                    : "Kahandaan ng Critical Facilities"
-                }
-                value={capacity?.criticalFacilityReadiness}
-                helpContent={getHelpContent("criticalFacilities", language)}
-                helpAlign="right"
-              />
-              <Field
-                label={language === "en" ? "Communication Capability" : "Communication Capability"}
-                value={capacity?.communicationCapability}
-                helpContent={getHelpContent("communicationCapability", language)}
-                helpAlign="right"
-              />
-            </div>
-          </section>
-
-          {/* Why This Needs Attention */}
-          <section aria-labelledby="lgu-card-evidence">
-            <div className="mb-3 flex items-center gap-2">
-              <Database className="h-4 w-4 text-blue-600" aria-hidden="true" />
-              <h2 id="lgu-card-evidence" className="text-sm font-bold text-slate-900">
-                {language === "en" ? "Why This Needs Attention" : "Bakit Kailangan ng Atensyon"}
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 p-4">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {language === "en" ? "Assessment Evidence" : "Assessment Evidence"}
-                  </span>
-                  <HelpTooltip
-                    content={getHelpContent("assessmentEvidence", language)}
-                    align="left"
-                    className="agap-print-hide"
-                  />
-                </div>
-                {evidence.length > 0 ? (
-                  <ul className="mt-3 space-y-2 text-xs leading-relaxed text-slate-700">
-                    {evidence.map((item, index) => (
-                      <li key={`${item}-${index}`} className="flex gap-2">
-                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-3 text-xs text-slate-500">
-                    {language === "en"
-                      ? "No verified evidence has been connected yet."
-                      : "Wala pang nakakonektang beripikadong ebidensya."}
-                  </p>
-                )}
-              </div>
-
-              <div className="rounded-xl border border-slate-200 p-4">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {language === "en"
-                      ? "Information Gaps and Limitations"
-                      : "Kakulangan at Limitasyon ng Impormasyon"}
-                  </span>
-                  <HelpTooltip
-                    content={getHelpContent("dataGaps", language)}
-                    align="right"
-                    className="agap-print-hide"
-                  />
-                </div>
-                {dataGaps.length > 0 ? (
-                  <ul className="mt-3 space-y-2 text-xs leading-relaxed text-slate-700">
-                    {dataGaps.map((item, index) => (
-                      <li key={`${item}-${index}`} className="flex gap-2">
-                        <AlertTriangle
-                          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600"
-                          aria-hidden="true"
-                        />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="mt-3 text-xs text-slate-500">
-                    {language === "en"
-                      ? "No information-gap or limitation records are available yet."
-                      : "Wala pang available na tala ng information gaps o limitations."}
-                  </p>
-                )}
-              </div>
-            </div>
-          </section>
-
-          {/* Recommendations */}
+        <div className="space-y-7 p-5 sm:p-6">
           <section aria-labelledby="lgu-card-actions">
             <div className="mb-3 flex items-center gap-2">
               <ClipboardCheck className="h-4 w-4 text-blue-600" aria-hidden="true" />
-              <h2 id="lgu-card-actions" className="text-sm font-bold text-slate-900">
-                {language === "en"
-                  ? "Recommended LGU Actions for Review"
-                  : "Recommended LGU Actions for Review"}
+              <h2 id="lgu-card-actions" className="text-base font-bold text-slate-950">
+                {language === "en" ? "What the LGU should review next" : "Mga susunod na dapat suriin ng LGU"}
               </h2>
               <HelpTooltip
                 content={getHelpContent("recommendedLGUActions", language)}
@@ -689,59 +562,73 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
 
             {recommendations.length > 0 ? (
               <div className="space-y-3">
-                {recommendations.map((item) => (
+                {recommendations.map((item, index) => (
                   <article
                     key={item.id}
-                    className="rounded-xl border border-slate-200 bg-slate-50/40 p-4"
+                    className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
                   >
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div>
-                        <h3 className="text-sm font-bold text-slate-900">{item.action}</h3>
-                        <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                          {display(item.whyItApplies)}
-                        </p>
+                    <div className="flex gap-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-50 text-sm font-black text-blue-700">
+                        {index + 1}
                       </div>
-                      {item.status ? (
-                        <span
-                          className={`self-start rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${statusStyles[item.status]}`}
-                        >
-                          {item.status.replaceAll("_", " ")}
-                        </span>
-                      ) : null}
-                    </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div>
+                            <h3 className="text-sm font-bold leading-relaxed text-slate-950">
+                              {item.action}
+                            </h3>
+                            <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                              {display(item.whyItApplies)}
+                            </p>
+                          </div>
+                          {item.status ? (
+                            <span
+                              className={`self-start rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${statusStyles[item.status]}`}
+                            >
+                              {item.status.replaceAll("_", " ")}
+                            </span>
+                          ) : null}
+                        </div>
 
-                    <dl className="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                      <div>
-                        <dt className="font-bold text-slate-400">Condition / Trigger</dt>
-                        <dd className="mt-0.5 text-slate-700">{display(item.trigger)}</dd>
-                      </div>
-                      <div>
-                        <dt className="font-bold text-slate-400">Evidence</dt>
-                        <dd className="mt-0.5 text-slate-700">{display(item.evidence)}</dd>
-                      </div>
-                      <div>
-                        <dt className="font-bold text-slate-400">Action Rule Reference</dt>
-                        <dd className="mt-0.5 text-slate-700">{display(item.sourceRule)}</dd>
-                      </div>
-                      <div>
-                        <dt className="font-bold text-slate-400">Responsible LGU Unit</dt>
-                        <dd className="mt-0.5 text-slate-700">{display(item.responsibleUnit)}</dd>
-                      </div>
-                    </dl>
+                        <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                          <p className="rounded-lg bg-slate-50 px-3 py-2 text-slate-700">
+                            <strong className="text-slate-900">Triggered because: </strong>
+                            {friendlyTrigger(item.trigger)}
+                          </p>
+                          <p className="rounded-lg bg-slate-50 px-3 py-2 text-slate-700">
+                            <strong className="text-slate-900">Responsible unit: </strong>
+                            {display(item.responsibleUnit)}
+                          </p>
+                        </div>
 
-                    <div className="mt-3 text-[11px] text-slate-500">
-                      {language === "en" ? "LGU confirmation required: " : "Kailangan ng LGU confirmation: "}
-                      <strong className="text-slate-700">
-                        {item.confirmationRequired === null
-                          ? EMPTY
-                          : item.confirmationRequired
-                            ? language === "en"
-                              ? "Yes"
-                              : "Oo"
-                            : language === "en"
-                              ? "No"
-                              : "Hindi"}
-                      </strong>
+                        <details className="agap-print-hide mt-3 text-xs">
+                          <summary className="cursor-pointer font-semibold text-blue-700">
+                            View rule and evidence details
+                          </summary>
+                          <div className="mt-2 grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-slate-600 sm:grid-cols-2">
+                            <p>
+                              <strong className="text-slate-800">Evidence: </strong>
+                              {friendlyEvidence(item.evidence)}
+                            </p>
+                            <p>
+                              <strong className="text-slate-800">Rule: </strong>
+                              {ruleId(item.sourceRule)}
+                            </p>
+                            <p className="sm:col-span-2">
+                              <strong className="text-slate-800">LGU confirmation required: </strong>
+                              {item.confirmationRequired === null
+                                ? EMPTY
+                                : item.confirmationRequired
+                                  ? language === "en"
+                                    ? "Yes"
+                                    : "Oo"
+                                  : language === "en"
+                                    ? "No"
+                                    : "Hindi"}
+                            </p>
+                          </div>
+                        </details>
+                      </div>
                     </div>
                   </article>
                 ))}
@@ -750,30 +637,265 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
               <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-6 text-center">
                 <FileText className="mx-auto h-5 w-5 text-slate-400" aria-hidden="true" />
                 <p className="mt-2 text-sm font-semibold text-slate-700">
-                  {language === "en"
-                    ? "No verified, source-based LGU actions are available yet"
-                    : "Wala pang verified at source-based na LGU actions"}
-                </p>
-                <p className="mx-auto mt-1 max-w-lg text-xs leading-relaxed text-slate-500">
-                  {language === "en"
-                    ? "Recommended actions will appear after verified conditions are matched with the approved action-rule library."
-                    : "Lalabas ang recommended actions kapag na-match ang verified conditions sa approved action-rule library."}
+                  No verified, source based LGU actions are available yet
                 </p>
               </div>
             )}
           </section>
+
+          <section aria-labelledby="lgu-card-exposure">
+            <div className="mb-3 flex items-center gap-2">
+              <Users className="h-4 w-4 text-blue-600" aria-hidden="true" />
+              <h2 id="lgu-card-exposure" className="text-base font-bold text-slate-950">
+                {language === "en"
+                  ? "Potentially exposed population"
+                  : "Tinatayang populasyong posibleng malantad"}
+              </h2>
+              <HelpTooltip
+                content={getHelpContent("potentiallyExposedPopulation", language)}
+                align="left"
+                className="agap-print-hide"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="text-2xl font-black text-slate-950">
+                  {formatNumber(exposure?.estimatedPersons)}
+                </p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Estimated potentially exposed persons
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="text-2xl font-black text-slate-950">
+                  {formatNumber(exposure?.estimatedHouseholds)}
+                </p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Estimated households
+                </p>
+              </div>
+            </div>
+
+            {vulnerableGroups.length > 0 ? (
+              <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Estimated vulnerable groups
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {vulnerableGroups.map((group) => (
+                    <span
+                      key={group.label}
+                      className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700"
+                    >
+                      {group.label}: {group.value}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            <p className="mt-3 text-xs leading-relaxed text-slate-500">
+              Estimate confidence: <strong className="text-slate-700">{friendlyConfidence(exposure?.confidenceLevel)}</strong>.
+              This is a planning estimate, not a confirmed affected population.
+            </p>
+          </section>
+
+          <section aria-labelledby="lgu-card-capacity">
+            <div className="mb-3 flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-blue-600" aria-hidden="true" />
+              <h2 id="lgu-card-capacity" className="text-base font-bold text-slate-950">
+                {language === "en" ? "Evacuation and facility readiness" : "Evacuation at facility readiness"}
+              </h2>
+              <HelpTooltip
+                content={getHelpContent("preparednessCapacity", language)}
+                align="left"
+                className="agap-print-hide"
+              />
+            </div>
+
+            {facilities.length > 0 ? (
+              <div className="overflow-hidden rounded-xl border border-slate-200">
+                <div className="hidden grid-cols-[1fr_180px_140px] gap-3 bg-slate-50 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-500 sm:grid">
+                  <span>Facility</span>
+                  <span>Status</span>
+                  <span>Capacity</span>
+                </div>
+                {facilities.map((facility, index) => {
+                  const status = (facility.operationalStatus || "Unknown").toUpperCase();
+                  const statusClass =
+                    status.includes("NEEDS") || status.includes("CONFIRM")
+                      ? "border-amber-200 bg-amber-50 text-amber-800"
+                      : status.includes("READY") || status.includes("OPERATIONAL")
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : "border-slate-200 bg-slate-50 text-slate-600";
+                  return (
+                    <div
+                      key={`${facility.name}-${index}`}
+                      className="grid gap-2 border-t border-slate-100 px-4 py-3 text-sm first:border-t-0 sm:grid-cols-[1fr_180px_140px] sm:items-center sm:gap-3"
+                    >
+                      <span className="font-semibold text-slate-900">{facility.name}</span>
+                      <span className={`w-fit rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${statusClass}`}>
+                        {humanizeToken(facility.operationalStatus || "Unknown")}
+                      </span>
+                      <span className="text-slate-700">
+                        <span className="mr-1 text-xs text-slate-400 sm:hidden">Capacity:</span>
+                        {facility.capacity ? formatNumber(facility.capacity) : "Not recorded"}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                Critical facility readiness has not been structured into individual facility records yet.
+              </p>
+            )}
+
+            <div className="mt-3 rounded-xl border border-slate-200 p-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Communication capability
+              </p>
+              {communicationMethods.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {communicationMethods.map((method) => (
+                    <span
+                      key={method}
+                      className="rounded-full border border-blue-100 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800"
+                    >
+                      {humanizeToken(method)}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm text-slate-600">Not recorded</p>
+              )}
+            </div>
+          </section>
+
+          <section aria-labelledby="lgu-card-evidence">
+            <div className="mb-3 flex items-center gap-2">
+              <Database className="h-4 w-4 text-blue-600" aria-hidden="true" />
+              <h2 id="lgu-card-evidence" className="text-base font-bold text-slate-950">
+                {language === "en" ? "Why this needs attention" : "Bakit kailangan ng atensyon"}
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Assessment evidence
+                </p>
+                {evidence.length > 0 ? (
+                  <ul className="mt-3 space-y-2 text-sm leading-relaxed text-slate-700">
+                    {evidence.map((item, index) => (
+                      <li key={`${item}-${index}`} className="flex gap-2">
+                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-sm text-slate-500">
+                    No verified evidence has been connected yet.
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-4">
+                <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Information gaps and limitations
+                </p>
+                {dataGaps.length > 0 ? (
+                  <ul className="mt-3 space-y-2 text-sm leading-relaxed text-slate-700">
+                    {dataGaps.map((item, index) => (
+                      <li key={`${item}-${index}`} className="flex gap-2">
+                        <AlertTriangle
+                          className="mt-0.5 h-4 w-4 shrink-0 text-amber-600"
+                          aria-hidden="true"
+                        />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-sm text-slate-500">
+                    No information gaps are recorded.
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <details className="agap-print-hide rounded-xl border border-slate-200 bg-slate-50/60">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-slate-800">
+              View source, methodology and assessment details
+            </summary>
+            <div className="space-y-5 border-t border-slate-200 p-4">
+              <section>
+                <div className="mb-3 flex items-center gap-2">
+                  <Radio className="h-4 w-4 text-blue-600" aria-hidden="true" />
+                  <h3 className="text-sm font-bold text-slate-900">Official advisory information</h3>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Advisory / Bulletin" value={advisory?.reference} />
+                  <Field label="Issued / Updated" value={formatDateTime(advisory?.issuedAt, language)} />
+                  <Field label="Valid Until" value={formatDateTime(advisory?.validity, language)} />
+                  <div className="rounded-xl border border-slate-200 bg-white p-3.5">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Advisory Status
+                    </p>
+                    <div className="mt-1.5">
+                      <StateBadge
+                        state={advisory?.verificationState ?? "UNVERIFIED"}
+                        language={language}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <div className="mb-3 flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-blue-600" aria-hidden="true" />
+                  <h3 className="text-sm font-bold text-slate-900">DRRM assessment details</h3>
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <Field label="Likelihood" value={assessment?.likelihood} />
+                  <Field label="Severity" value={assessment?.severity} />
+                  <Field label="Risk Result" value={assessment?.riskResult} />
+                  <Field label="Relative Vulnerability" value={assessment?.relativeVulnerability} />
+                </div>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field label="Assessment Methodology" value={assessment?.methodology} />
+                  <Field label="Assessment Date" value={formatDateTime(assessment?.assessmentDate, language)} />
+                </div>
+              </section>
+
+              <section>
+                <h3 className="text-sm font-bold text-slate-900">Exposure estimate details</h3>
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <Field label="Estimation Method" value={friendlyMethod(exposure?.estimationMethod)} />
+                  <Field label="Confidence Level" value={friendlyConfidence(exposure?.confidenceLevel)} />
+                  <Field label="Source" value={exposure?.source} />
+                  <Field label="Data Reference Date" value={formatDateTime(exposure?.referenceDate, language)} />
+                </div>
+              </section>
+
+              <p className="rounded-xl border border-blue-100 bg-blue-50/60 p-3 text-xs leading-relaxed text-blue-900">
+                Risk follows the documented DRRM method and verified inputs. AI may explain the result but cannot change the calculation.
+              </p>
+            </div>
+          </details>
         </div>
 
-        {/* LGU Controls */}
         <div className="agap-print-hide border-t border-slate-200 bg-slate-50/80 p-4 sm:p-5">
           <div className="mb-3">
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              {language === "en" ? "Authorized LGU Controls" : "Authorized LGU Controls"}
+              Authorized LGU Controls
             </h2>
             <p className="mt-1 text-[11px] text-slate-500">
-              {language === "en"
-                ? "These controls are available only to authorized LGU users. Disabled controls are not yet connected to the required system action."
-                : "Ang controls na ito ay para lamang sa authorized LGU users. Ang disabled controls ay hindi pa nakakonekta sa kinakailangang system action."}
+              These controls are available only to authorized LGU users. Disabled controls are not yet connected to the required system action.
             </p>
           </div>
 
