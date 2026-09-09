@@ -9,12 +9,24 @@ import {
   TOP_BARANGAYS,
   OTHER_BARANGAYS,
   BarangayPriority,
-} from "@/lib/mock-data"
+} from "@/lib/mock-data";
+
+export type DemoUserView = "lgu" | "barangay-gulang-gulang" | "field-responder" | "public-resident";
+
+export const GULANG_GULANG_BARANGAY_ID = "gulang-gulang";
 
 interface NavigationContextType {
   currentModule: PrimaryModuleId;
   setCurrentModule: (id: PrimaryModuleId) => void;
   activeNavItem: NavItemConfig;
+
+  // Demo user access scope
+  userView: DemoUserView;
+  setUserView: (view: DemoUserView) => void;
+  isBarangayUser: boolean;
+  isPublicUser: boolean;
+  assignedBarangayId: string | null;
+  assignedBarangay: BarangayPriority | null;
 
   // Prepare sub-routing
   prepareSubView: PrepareSubView;
@@ -41,18 +53,30 @@ interface NavigationContextType {
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
 
 export function NavigationProvider({ children }: { children: React.ReactNode }) {
-  const [currentModule, setCurrentModule] = useState<PrimaryModuleId>("home");
-  const [prepareSubView, setPrepareSubView] = useState<PrepareSubView>("menu");
-  const [selectedBarangayId, setSelectedBarangayId] = useState<string>("dalahican");
+  const [currentModule, setCurrentModuleState] = useState<PrimaryModuleId>("home");
+  const [prepareSubView, setPrepareSubViewState] = useState<PrepareSubView>("menu");
+  const [selectedBarangayId, setSelectedBarangayIdState] = useState<string>("dalahican");
+  const [userView, setUserViewState] = useState<DemoUserView>("lgu");
   const [isAdvisoryModalOpen, setIsAdvisoryModalOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
+  const allBarangays = [...TOP_BARANGAYS, ...OTHER_BARANGAYS];
+
+  const isBarangayUser = userView === "barangay-gulang-gulang";
+  const isPublicUser = userView === "public-resident";
+  const assignedBarangayId = isBarangayUser ? GULANG_GULANG_BARANGAY_ID : null;
+  const assignedBarangay =
+    assignedBarangayId !== null
+      ? allBarangays.find((barangay) => barangay.id === assignedBarangayId) ?? null
+      : null;
+
+  const selectedBarangay =
+    allBarangays.find((barangay) => barangay.id === selectedBarangayId) ||
+    assignedBarangay ||
+    TOP_BARANGAYS[0];
+
   const activeNavItem =
     PRIMARY_NAV_ITEMS.find((item) => item.id === currentModule) || PRIMARY_NAV_ITEMS[0];
-
-  const allBarangays = [...TOP_BARANGAYS, ...OTHER_BARANGAYS];
-  const selectedBarangay =
-    allBarangays.find((b) => b.id === selectedBarangayId) || TOP_BARANGAYS[0];
 
   const scrollToTop = () => {
     if (typeof window !== "undefined") {
@@ -60,45 +84,140 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     }
   };
 
-  const handleSetCurrentModule = (id: PrimaryModuleId) => {
-    setCurrentModule(id);
-    if (id === "prepare") {
-      setPrepareSubView("menu");
+  const setUserView = (view: DemoUserView) => {
+    setUserViewState(view);
+
+    if (view === "barangay-gulang-gulang") {
+      setSelectedBarangayIdState(GULANG_GULANG_BARANGAY_ID);
+
+      // Barangay users never retain citywide assessment/recovery screens.
+      if (currentModule === "recovery") {
+        setCurrentModuleState("home");
+      }
+
+      if (
+        currentModule === "prepare" &&
+        (prepareSubView === "priority-barangays" || prepareSubView === "barangay-detail")
+      ) {
+        setPrepareSubViewState("barangay-detail");
+      }
     }
+
+    if (view === "public-resident") {
+      // The public experience is rendered outside the internal LGU module shell.
+      setCurrentModuleState("home");
+      setPrepareSubViewState("menu");
+    }
+
+    scrollToTop();
+  };
+
+  const setSelectedBarangayId = (id: string) => {
+    setSelectedBarangayIdState(
+      isBarangayUser ? GULANG_GULANG_BARANGAY_ID : id
+    );
+  };
+
+  const setPrepareSubView = (view: PrepareSubView) => {
+    if (
+      isBarangayUser &&
+      (view === "priority-barangays" || view === "barangay-detail")
+    ) {
+      setSelectedBarangayIdState(GULANG_GULANG_BARANGAY_ID);
+      setPrepareSubViewState("barangay-detail");
+      return;
+    }
+
+    setPrepareSubViewState(view);
+  };
+
+  const setCurrentModule = (id: PrimaryModuleId) => {
+    // Recovery/Post Impact remains an LGU-level workflow for this barangay demo.
+    if (isBarangayUser && id === "recovery") {
+      setCurrentModuleState("home");
+      scrollToTop();
+      return;
+    }
+
+    setCurrentModuleState(id);
+
+    if (id === "prepare") {
+      setPrepareSubViewState("menu");
+    }
+
+    if (isBarangayUser) {
+      setSelectedBarangayIdState(GULANG_GULANG_BARANGAY_ID);
+    }
+
     scrollToTop();
   };
 
   const goToHome = () => {
-    setCurrentModule("home");
+    setCurrentModuleState("home");
     scrollToTop();
   };
 
   const goToPrepare = (subView: PrepareSubView = "menu") => {
-    setCurrentModule("prepare");
-    setPrepareSubView(subView);
+    setCurrentModuleState("prepare");
+    setSelectedBarangayIdState(
+      isBarangayUser ? GULANG_GULANG_BARANGAY_ID : selectedBarangayId
+    );
+
+    if (
+      isBarangayUser &&
+      (subView === "priority-barangays" || subView === "barangay-detail")
+    ) {
+      setPrepareSubViewState("barangay-detail");
+    } else {
+      setPrepareSubViewState(subView);
+    }
+
     scrollToTop();
   };
 
   const goToPriorityBarangays = () => {
-    setCurrentModule("prepare");
-    setPrepareSubView("priority-barangays");
+    setCurrentModuleState("prepare");
+
+    if (isBarangayUser) {
+      setSelectedBarangayIdState(GULANG_GULANG_BARANGAY_ID);
+      setPrepareSubViewState("barangay-detail");
+    } else {
+      setPrepareSubViewState("priority-barangays");
+    }
+
     scrollToTop();
   };
 
   const goToBarangayDetail = (barangayId: string) => {
-    setSelectedBarangayId(barangayId);
-    setCurrentModule("prepare");
-    setPrepareSubView("barangay-detail");
+    setCurrentModuleState("prepare");
+
+    if (isBarangayUser) {
+      setSelectedBarangayIdState(GULANG_GULANG_BARANGAY_ID);
+    } else {
+      setSelectedBarangayIdState(barangayId);
+    }
+
+    setPrepareSubViewState("barangay-detail");
     scrollToTop();
   };
 
   const goToReportDamage = () => {
-    setCurrentModule("report-damage");
+    if (isBarangayUser) {
+      setSelectedBarangayIdState(GULANG_GULANG_BARANGAY_ID);
+    }
+
+    setCurrentModuleState("report-damage");
     scrollToTop();
   };
 
   const goToRecovery = () => {
-    setCurrentModule("recovery");
+    if (isBarangayUser) {
+      setCurrentModuleState("home");
+      scrollToTop();
+      return;
+    }
+
+    setCurrentModuleState("recovery");
     scrollToTop();
   };
 
@@ -106,8 +225,14 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
     <NavigationContext.Provider
       value={{
         currentModule,
-        setCurrentModule: handleSetCurrentModule,
+        setCurrentModule,
         activeNavItem,
+        userView,
+        setUserView,
+        isBarangayUser,
+        isPublicUser,
+        assignedBarangayId,
+        assignedBarangay,
         prepareSubView,
         setPrepareSubView,
         selectedBarangayId,
@@ -132,8 +257,10 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
 
 export function useNavigation() {
   const context = useContext(NavigationContext);
+
   if (!context) {
     throw new Error("useNavigation must be used within a NavigationProvider");
   }
+
   return context;
 }

@@ -34,6 +34,8 @@ export const ModulePlaceholder: React.FC = () => {
     goToPriorityBarangays,
     goToBarangayDetail,
     setIsAdvisoryModalOpen,
+    isBarangayUser,
+    assignedBarangay,
   } = useNavigation();
   const { language, t } = useLanguage();
 
@@ -72,6 +74,24 @@ export const ModulePlaceholder: React.FC = () => {
     TOP_BARANGAYS[0]?.name ?? OTHER_BARANGAYS[0]?.name ?? ""
   );
 
+  const barangayUserName = assignedBarangay?.name ?? "Gulang-Gulang";
+
+  // Keep the Barangay Gulang-Gulang demo scoped to its assigned barangay.
+  useEffect(() => {
+    if (isBarangayUser) {
+      setIsAdvisoryFormOpen(false);
+      setSelectedReportBarangay(barangayUserName);
+      setSelectedPostImpactBarangay(barangayUserName);
+
+      if (!isReportSubmitted) {
+        setReportStep(2);
+      }
+    } else if (!isReportSubmitted) {
+      setReportStep(1);
+      setSelectedReportBarangay("");
+    }
+  }, [isBarangayUser, barangayUserName, isReportSubmitted]);
+
   // =========================================================================
   // VIEW 1: DASHBOARD
   // =========================================================================
@@ -79,7 +99,7 @@ export const ModulePlaceholder: React.FC = () => {
     const advisory = CURRENT_OFFICIAL_ADVISORY;
     const advisoryTitle = language === "en" ? advisory.titleEn : advisory.titleFil;
 
-    if (isAdvisoryFormOpen) {
+    if (isAdvisoryFormOpen && !isBarangayUser) {
       return (
         <div className="animate-in fade-in duration-200">
           <AdvisoryForm
@@ -110,15 +130,25 @@ export const ModulePlaceholder: React.FC = () => {
         <header className="pt-1 sm:pt-2">
           <div className="max-w-2xl">
             <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-700">
-              {language === "en" ? "City Operations Overview" : "Buod ng Operasyon ng Lungsod"}
+              {isBarangayUser
+                ? language === "en"
+                  ? "Barangay Gulang-Gulang Operations"
+                  : "Operasyon ng Barangay Gulang-Gulang"
+                : language === "en"
+                  ? "City Operations Overview"
+                  : "Buod ng Operasyon ng Lungsod"}
             </span>
             <h1 className="mt-2 text-3xl sm:text-4xl font-black tracking-tight text-slate-900">
               PROJECT AGAP
             </h1>
             <p className="mt-2 text-sm sm:text-base leading-relaxed text-slate-500">
-              {language === "en"
-                ? "A calm operational overview of advisories, verified assessment data, connectivity, and data freshness for Lucena City responders."
-                : "Isang malinaw na operational overview ng mga abiso, beripikadong assessment data, koneksyon, at pagiging napapanahon ng datos para sa mga responder ng Lungsod ng Lucena."}
+              {isBarangayUser
+                ? language === "en"
+                  ? "Local advisory, risk, preparedness, connectivity, and reporting information for Barangay Gulang-Gulang."
+                  : "Lokal na advisory, risk, preparedness, connectivity, at reporting information para sa Barangay Gulang-Gulang."
+                : language === "en"
+                  ? "A calm operational overview of advisories, verified assessment data, connectivity, and data freshness for Lucena City responders."
+                  : "Isang malinaw na operational overview ng mga abiso, beripikadong assessment data, koneksyon, at pagiging napapanahon ng datos para sa mga responder ng Lungsod ng Lucena."}
             </p>
           </div>
         </header>
@@ -155,13 +185,15 @@ export const ModulePlaceholder: React.FC = () => {
               >
                 {t("viewAdvisory")}
               </button>
-              <button
-                type="button"
-                onClick={() => setIsAdvisoryFormOpen(true)}
-                className="min-h-[40px] rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-              >
-                {language === "en" ? "Update Advisory" : "I-update ang Babala"}
-              </button>
+              {!isBarangayUser ? (
+                <button
+                  type="button"
+                  onClick={() => setIsAdvisoryFormOpen(true)}
+                  className="min-h-[40px] rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  {language === "en" ? "Update Advisory" : "I-update ang Babala"}
+                </button>
+              ) : null}
             </div>
           </div>
         </section>
@@ -181,12 +213,22 @@ export const ModulePlaceholder: React.FC = () => {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <h2 className="text-base sm:text-lg font-bold text-slate-900">
-                  {language === "en" ? "City Risk Overview" : "Buod ng Panganib sa Lungsod"}
+                  {isBarangayUser
+                    ? language === "en"
+                      ? "Gulang-Gulang Risk & Preparedness Overview"
+                      : "Risk at Preparedness Overview ng Gulang-Gulang"
+                    : language === "en"
+                      ? "City Risk Overview"
+                      : "Buod ng Panganib sa Lungsod"}
                 </h2>
                 <p className="mt-1 text-xs sm:text-sm text-slate-500">
-                  {language === "en"
-                    ? "Barangay risk visualization will appear here once verified operational data is connected."
-                    : "Lalabas dito ang visualization ng panganib ng barangay kapag nakakonekta na ang beripikadong operational data."}
+                  {isBarangayUser
+                    ? language === "en"
+                      ? "Only verified risk and preparedness information for Barangay Gulang-Gulang is shown in this user view."
+                      : "Verified risk at preparedness information lamang ng Barangay Gulang-Gulang ang ipinapakita sa user view na ito."
+                    : language === "en"
+                      ? "Barangay risk visualization will appear here once verified operational data is connected."
+                      : "Lalabas dito ang visualization ng panganib ng barangay kapag nakakonekta na ang beripikadong operational data."}
                 </p>
               </div>
               <span className="self-start rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -229,7 +271,15 @@ export const ModulePlaceholder: React.FC = () => {
                 onClick={goToPriorityBarangays}
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-700 hover:text-blue-900"
               >
-                <span>{language === "en" ? "Open Risk Assessment" : "Buksan ang Risk Assessment"}</span>
+                <span>
+                  {isBarangayUser
+                    ? language === "en"
+                      ? "Review Gulang-Gulang Risk"
+                      : "Suriin ang Risk ng Gulang-Gulang"
+                    : language === "en"
+                      ? "Open Risk Assessment"
+                      : "Buksan ang Risk Assessment"}
+                </span>
                 <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
               </button>
             </div>
@@ -295,9 +345,23 @@ export const ModulePlaceholder: React.FC = () => {
       {
         id: "barangay-assessments",
         category: language === "en" ? "Assessment" : "Pagtatasa",
-        title: t("taskSeePriorities"),
-        description: t("taskSeePrioritiesDesc"),
-        actionLabel: language === "en" ? "Open Assessment" : "Buksan ang Assessment",
+        title: isBarangayUser
+          ? language === "en"
+            ? "Review Gulang-Gulang Risk Assessment"
+            : "Suriin ang Risk Assessment ng Gulang-Gulang"
+          : t("taskSeePriorities"),
+        description: isBarangayUser
+          ? language === "en"
+            ? "Review the verified risk information and assessment details for your assigned barangay."
+            : "Suriin ang verified risk information at assessment details ng inyong assigned barangay."
+          : t("taskSeePrioritiesDesc"),
+        actionLabel: isBarangayUser
+          ? language === "en"
+            ? "Review Assessment"
+            : "Suriin ang Assessment"
+          : language === "en"
+            ? "Open Assessment"
+            : "Buksan ang Assessment",
         image: "/images/preparedness/barangay-assessments.png",
         onClick: goToPriorityBarangays,
       },
@@ -374,9 +438,13 @@ export const ModulePlaceholder: React.FC = () => {
                   id="preparedness-overview-heading"
                   className="mt-1 text-base font-bold text-slate-900 sm:text-lg"
                 >
-                  {language === "en"
-                    ? "Turn verified information into practical preparedness workflows."
-                    : "Gawing practical preparedness workflows ang beripikadong impormasyon."}
+                  {isBarangayUser
+                    ? language === "en"
+                      ? "Preparedness workflows for Barangay Gulang-Gulang."
+                      : "Preparedness workflows para sa Barangay Gulang-Gulang."
+                    : language === "en"
+                      ? "Turn verified information into practical preparedness workflows."
+                      : "Gawing practical preparedness workflows ang beripikadong impormasyon."}
                 </h2>
                 <p className="mt-1.5 max-w-2xl text-xs leading-relaxed text-slate-500 sm:text-sm">
                   {language === "en"
@@ -569,6 +637,105 @@ export const ModulePlaceholder: React.FC = () => {
     const assessment = b.riskAssessment;
     const advisory = CURRENT_OFFICIAL_ADVISORY;
 
+    if (isBarangayUser) {
+      const localAssessmentFields = [
+        ["Likelihood of Occurrence", assessment.likelihood ?? "—"],
+        ["Severity of Consequence", assessment.severity ?? "—"],
+        ["Risk Result", assessment.riskResult ?? "—"],
+        [
+          "Relative Vulnerability",
+          assessment.relativeVulnerability === null ||
+          assessment.relativeVulnerability === undefined
+            ? "—"
+            : String(assessment.relativeVulnerability),
+        ],
+        ["Assessment Methodology", assessment.methodology ?? "—"],
+        ["Assessment Date", assessment.assessmentDate ?? "—"],
+        ["Confidence Level", assessment.confidenceLevel ?? "—"],
+      ];
+
+      return (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          <div>
+            <button
+              type="button"
+              onClick={() => setPrepareSubView("menu")}
+              className="mb-2 flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-slate-900"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{t("backToPrepare")}</span>
+            </button>
+
+            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-blue-700">
+              Assigned Barangay
+            </span>
+            <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-900">
+              Barangay {b.name} Risk Assessment
+            </h1>
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-slate-500">
+              Read-only risk information for your assigned barangay. Citywide barangay rankings and LGU approval controls are not included in this view.
+            </p>
+          </div>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {localAssessmentFields.map(([label, value]) => (
+                <div
+                  key={label}
+                  className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5"
+                >
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {label}
+                  </span>
+                  <span className="mt-1 block text-sm font-semibold text-slate-900">
+                    {value}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 p-4">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Assessment Evidence
+                </span>
+                {assessment.evidence.length > 0 ? (
+                  <ul className="mt-3 space-y-2 text-xs leading-relaxed text-slate-700">
+                    {assessment.evidence.map((item, index) => (
+                      <li key={`${item}-${index}`} className="flex gap-2">
+                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-xs text-slate-500">No verified evidence is available yet.</p>
+                )}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-4">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Information Gaps and Limitations
+                </span>
+                {assessment.limitations.length > 0 ? (
+                  <ul className="mt-3 space-y-2 text-xs leading-relaxed text-slate-700">
+                    {assessment.limitations.map((item, index) => (
+                      <li key={`${item}-${index}`} className="flex gap-2">
+                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-xs text-slate-500">No information-gap records are available yet.</p>
+                )}
+              </div>
+            </div>
+          </section>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-6 animate-in fade-in duration-200">
         <div>
@@ -755,8 +922,9 @@ export const ModulePlaceholder: React.FC = () => {
         </div>
 
         <HouseholdActionCard
-          barangays={barangayNames}
-          initialBarangay={selectedBarangay.name}
+          barangays={isBarangayUser ? [barangayUserName] : barangayNames}
+          initialBarangay={isBarangayUser ? barangayUserName : selectedBarangay.name}
+          lockedBarangay={isBarangayUser ? barangayUserName : undefined}
           output={null}
         />
 
@@ -938,8 +1106,8 @@ export const ModulePlaceholder: React.FC = () => {
               type="button"
               onClick={() => {
                 setIsReportSubmitted(false);
-                setReportStep(1);
-                setSelectedReportBarangay("");
+                setReportStep(isBarangayUser ? 2 : 1);
+                setSelectedReportBarangay(isBarangayUser ? barangayUserName : "");
                 setSelectedIncident("");
                 setSelectedSeverity("");
                 setReportedAffectedPersons("");
@@ -1036,6 +1204,12 @@ export const ModulePlaceholder: React.FC = () => {
               : "Mananatiling unverified ang iniulat na impormasyon hanggang masuri ng awtorisadong LGU user."}
           </p>
 
+          {isBarangayUser ? (
+            <div className="mt-2 inline-flex items-center rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-[11px] font-semibold text-blue-900">
+              Reporting barangay: Barangay {barangayUserName}
+            </div>
+          ) : null}
+
           <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
             {language === "en"
               ? "This reporting form does not replace emergency dispatch. Immediate life-safety emergencies should still use authorized emergency channels."
@@ -1044,7 +1218,7 @@ export const ModulePlaceholder: React.FC = () => {
         </div>
 
         {/* STEP 1: Which Barangay? */}
-        {reportStep === 1 && (
+        {reportStep === 1 && !isBarangayUser && (
           <div className="space-y-4">
             <h2 className="text-base font-bold text-slate-900">
               {language === "en" ? "1. Which barangay are you reporting from?" : "1. Aling barangay ang iyong iniuulat?"}
@@ -1535,7 +1709,7 @@ export const ModulePlaceholder: React.FC = () => {
 
         {/* Navigation Buttons */}
         <div className="pt-2 flex items-center justify-between gap-3">
-          {reportStep > 1 ? (
+          {reportStep > (isBarangayUser ? 2 : 1) ? (
             <button
               type="button"
               onClick={() => setReportStep(reportStep - 1)}
@@ -1672,7 +1846,9 @@ export const ModulePlaceholder: React.FC = () => {
   if (currentModule === "prepare") {
     switch (prepareSubView) {
       case "priority-barangays":
-        return renderPriorityBarangaysView();
+        return isBarangayUser
+          ? renderBarangayDetailView()
+          : renderPriorityBarangaysView();
       case "barangay-detail":
         return renderBarangayDetailView();
       case "prep-brief":
@@ -1692,7 +1868,7 @@ export const ModulePlaceholder: React.FC = () => {
   }
 
   if (currentModule === "recovery") {
-    return renderPostImpactScreen();
+    return isBarangayUser ? renderHomeScreen() : renderPostImpactScreen();
   }
 
   return renderHomeScreen();

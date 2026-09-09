@@ -16,8 +16,12 @@ import {
   AlertOctagon,
 } from "lucide-react";
 
-export const HelpDialog: React.FC = () => {
-  const { isHelpOpen, setIsHelpOpen } = useNavigation();
+interface HelpDialogProps {
+  audience?: "auto" | "public";
+}
+
+export const HelpDialog: React.FC<HelpDialogProps> = ({ audience = "auto" }) => {
+  const { isHelpOpen, setIsHelpOpen, isPublicUser } = useNavigation();
   const { language, t } = useLanguage();
 
   // Handle ESC key to close
@@ -44,6 +48,140 @@ export const HelpDialog: React.FC = () => {
   }, [isHelpOpen]);
 
   if (!isHelpOpen) return null;
+
+
+  const isPublicAudience = audience === "public" || isPublicUser;
+
+  if (isPublicAudience) {
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="help-dialog-title"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-3 backdrop-blur-sm animate-in fade-in duration-200 sm:p-4"
+        onClick={() => setIsHelpOpen(false)}
+      >
+        <div
+          className="flex max-h-[90vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white text-slate-800 shadow-2xl"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <div className="flex items-center justify-between bg-slate-900 px-5 py-4 text-white">
+            <div>
+              <h2 id="help-dialog-title" className="text-lg font-bold">
+                {language === "en" ? "Help & Emergency" : "Tulong at Emergency"}
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-300">
+                {language === "en"
+                  ? "Household preparedness support for Lucena City"
+                  : "Household preparedness support para sa Lucena City"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsHelpOpen(false)}
+              className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-800 hover:text-white"
+              aria-label={t("close")}
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="space-y-5 overflow-y-auto p-5 sm:p-6">
+            <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" aria-hidden="true" />
+              <div>
+                <h3 className="text-sm font-bold text-amber-900">
+                  {language === "en" ? "Use official instructions" : "Sundin ang official instructions"}
+                </h3>
+                <p className="mt-1 text-xs leading-relaxed text-amber-800">
+                  {language === "en"
+                    ? "Project AGAP does not issue forecasts, warnings, evacuation orders, or safety declarations. Confirm the latest instructions from PAGASA, Lucena CDRRMO, your barangay, or other authorized agencies."
+                    : "Hindi naglalabas ang Project AGAP ng forecast, warning, evacuation order, o safety declaration. Kumpirmahin ang pinakabagong instructions mula sa PAGASA, Lucena CDRRMO, inyong barangay, o ibang authorized agencies."}
+                </p>
+              </div>
+            </div>
+
+            <section>
+              <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                <Info className="h-4 w-4 text-blue-600" aria-hidden="true" />
+                {language === "en" ? "Using the Household Action Card" : "Paggamit ng Household Action Card"}
+              </h3>
+              <div className="mt-3 space-y-2 text-xs leading-relaxed text-slate-600">
+                <p>
+                  {language === "en"
+                    ? "Use a Household Code if your barangay issued one, complete a Quick Household Profile, or choose the General Barangay Preparedness Card."
+                    : "Gumamit ng Household Code kung may ibinigay ang barangay, kumpletuhin ang Quick Household Profile, o piliin ang General Barangay Preparedness Card."}
+                </p>
+                <p>
+                  {language === "en"
+                    ? "Your full name and exact home address are not required for the MVP."
+                    : "Hindi kailangan ang buong pangalan at eksaktong home address para sa MVP."}
+                </p>
+              </div>
+            </section>
+
+            <section>
+              <h3 className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                <PhoneCall className="h-4 w-4 text-red-600" aria-hidden="true" />
+                {language === "en" ? "Emergency Contacts" : "Emergency Contacts"}
+              </h3>
+              <div className="mt-3 grid grid-cols-1 gap-2.5">
+                {LUCENA_EMERGENCY_CONTACTS.map((contact, index) => {
+                  const hasNumber =
+                    Boolean(contact.contactNumber) &&
+                    contact.contactNumber.trim() !== "—";
+
+                  return (
+                    <div
+                      key={`${contact.agencyEn}-${index}`}
+                      className="rounded-xl border border-slate-200 bg-slate-50 p-3"
+                    >
+                      <p className="text-xs font-bold text-slate-900">
+                        {language === "en" ? contact.agencyEn : contact.agencyFil}
+                      </p>
+                      <p className="mt-0.5 text-[11px] text-slate-500">
+                        {language === "en" ? contact.descriptionEn : contact.descriptionFil}
+                      </p>
+                      <div className="mt-2 flex items-center justify-between border-t border-slate-200/70 pt-2">
+                        <span className="text-xs font-semibold text-slate-700">
+                          {hasNumber
+                            ? contact.contactNumber
+                            : language === "en"
+                              ? "Official number not yet verified in AGAP"
+                              : "Hindi pa verified sa AGAP ang official number"}
+                        </span>
+                        {hasNumber ? (
+                          <a
+                            href={`tel:${contact.contactNumber.replace(/[^0-9+]/g, "")}`}
+                            className="rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-blue-700"
+                          >
+                            {language === "en" ? "Call" : "Tawagan"}
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-slate-200 bg-slate-100 px-5 py-3.5">
+            <span className="text-xs text-slate-500">
+              {language === "en" ? "Project AGAP Public Preparedness" : "Project AGAP Public Preparedness"}
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsHelpOpen(false)}
+              className="rounded-lg bg-slate-900 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+            >
+              {t("close")}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
