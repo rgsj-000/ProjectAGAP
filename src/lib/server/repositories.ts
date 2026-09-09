@@ -16,7 +16,7 @@ export async function activeRules(supabase: SupabaseClient, audience?: string): 
   if (audience) query = query.eq("target_audience", audience);
   const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).map((r: any) => ({ ruleId: r.rule_id, disasterPhase: r.disaster_phase, field: r.fact_field, operator: r.operator, threshold: r.threshold, approvedAction: r.approved_action, whyItApplies: r.why_it_applies, sourceAgency: r.source_agency, sourceDocument: r.source_document, targetAudience: r.target_audience, responsibleUnit: r.responsible_unit, requiresLguConfirmation: r.requires_lgu_confirmation, version: r.version, activeStatus: r.active_status }));
+  return (data ?? []).map((r: any) => ({ approvedActionFil:r.approved_action_fil,whyItAppliesFil:r.why_it_applies_fil,ruleId: r.rule_id, disasterPhase: r.disaster_phase, field: r.fact_field, operator: r.operator, threshold: r.threshold, approvedAction: r.approved_action, whyItApplies: r.why_it_applies, sourceAgency: r.source_agency, sourceDocument: r.source_document, targetAudience: r.target_audience, responsibleUnit: r.responsible_unit, requiresLguConfirmation: r.requires_lgu_confirmation, version: r.version, activeStatus: r.active_status }));
 }
 
 export function camelAdvisory(a: any) {

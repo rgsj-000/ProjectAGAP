@@ -11,6 +11,7 @@ import { HelpCircle, ChevronRight, Phone } from "lucide-react";
 export const AppHeader: React.FC = () => {
   const {
     currentModule,
+    goToHome,
     activeNavItem,
     prepareSubView,
     selectedBarangay,
@@ -109,11 +110,11 @@ export const AppHeader: React.FC = () => {
           {/* Subtle compact advisory pill on mobile */}
           <button
             type="button"
-            onClick={() => setIsAdvisoryModalOpen(true)}
+            onClick={goToHome}
             className="flex items-center gap-1.5 text-[11px] text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2 py-1 rounded-full font-medium transition-colors"
           >
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
-            <span>{t("activeAdvisoryBadge")}</span>
+            <span>{language === "en" ? "Advisories" : "Mga advisory"}</span>
           </button>
 
           <LanguageSelector variant="pill" />
@@ -142,12 +143,12 @@ export const AppHeader: React.FC = () => {
           {/* Subtle compact advisory indicator */}
           <button
             type="button"
-            onClick={() => setIsAdvisoryModalOpen(true)}
+            onClick={goToHome}
             className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-300 text-slate-700 hover:text-amber-900 text-xs font-medium transition-all"
             title="Click to view full advisory"
           >
             <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-            <span>{t("activeAdvisoryBadge")}</span>
+            <span>{language === "en" ? "Advisories" : "Mga advisory"}</span>
           </button>
 
           {/* Calm Help & Emergency access */}

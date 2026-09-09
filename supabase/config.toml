@@ -1,0 +1,10 @@
+# Only settings intentionally managed by this repository are declared.
+project_id = "project-agap"
+
+[auth]
+site_url = "https://project-agap.vercel.app"
+additional_redirect_urls = ["https://project-agap.vercel.app/auth/callback", "http://localhost:3000/auth/callback"]
+enable_signup = false
+
+[auth.email]
+enable_signup = false

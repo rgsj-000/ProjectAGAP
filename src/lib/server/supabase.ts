@@ -1,4 +1,5 @@
-import { createClient as createBrowserSupabase } from "@supabase/supabase-js";
+import { createBrowserClient as createBrowserSupabase } from "@supabase/ssr";
+import { createClient as createAdminSupabase } from "@supabase/supabase-js";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { AppError } from "./errors";
@@ -19,7 +20,7 @@ export function createAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new AppError("CONFIGURATION_ERROR", "Supabase server environment variables are missing.", 503);
-  return createBrowserSupabase(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+  return createAdminSupabase(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
 export async function createRequestClient() {

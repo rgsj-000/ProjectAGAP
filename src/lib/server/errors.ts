@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError } from "zod";
+import { DomainError } from "@/lib/domain/errors";
 
 export type ErrorCode =
   | "UNAUTHORIZED" | "FORBIDDEN" | "INVALID_INPUT" | "ADVISORY_NOT_VERIFIED"
@@ -21,7 +22,7 @@ export function fail(error: unknown) {
   if (error instanceof ZodError) {
     return NextResponse.json({ success: false, error: { code: "INVALID_INPUT", message: "Request validation failed.", details: error.flatten() } }, { status: 422 });
   }
-  if (error instanceof AppError) {
+  if (error instanceof AppError || error instanceof DomainError) {
     return NextResponse.json({ success: false, error: { code: error.code, message: error.message, details: error.details } }, { status: error.status });
   }
   console.error("Unhandled AGAP error", error);

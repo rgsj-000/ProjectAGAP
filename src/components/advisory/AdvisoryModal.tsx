@@ -94,8 +94,8 @@ export const AdvisoryModal: React.FC = () => {
             <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
             <span>
               {language === "en"
-                ? "Official advisory verified by Lucena CDRRMO Operations Center."
-                : "Opisyal na babalang beripikado ng Sentro ng Operasyon ng Lucena CDRRMO."}
+                ? "Verification has not been established for this demonstration advisory."
+                : "Hindi pa naitatatag ang beripikasyon ng demonstration advisory na ito."}
             </span>
           </div>
         </div>

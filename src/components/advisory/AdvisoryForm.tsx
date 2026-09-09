@@ -344,6 +344,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
       precautions: values.precautions.map((item) => item.trim()).filter(Boolean),
     };
 
+    setErrors({});
     setIsSaving(true);
     try {
       if (onSave) {
@@ -351,6 +352,8 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
       } else {
         setLocalSuccess(true);
       }
+    } catch (error) {
+      setErrors({ submit: error instanceof Error ? error.message : "Unable to save advisory. Try again." });
     } finally {
       setIsSaving(false);
     }
@@ -706,7 +709,8 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
         </div>
       </div>
 
-      {localSuccess && (
+      {errors.submit && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">{errors.submit}</p>}
+        {localSuccess && (
         <div
           role="status"
           className="flex items-start gap-2.5 rounded-xl border border-blue-200 bg-blue-50 p-3.5 text-xs text-blue-900"

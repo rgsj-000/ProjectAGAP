@@ -1,5 +1,5 @@
 export type Operator = "EQ" | "NEQ" | "GT" | "GTE" | "LT" | "LTE" | "IN" | "CONTAINS" | "TRUTHY";
-export interface ActionRule { ruleId: string; disasterPhase: string; field: string; operator: Operator; threshold: unknown; approvedAction: string; whyItApplies: string; sourceAgency: string; sourceDocument: string; targetAudience: string; responsibleUnit: string; requiresLguConfirmation: boolean; version: string; activeStatus: boolean; }
+export interface ActionRule { approvedActionFil?: string; whyItAppliesFil?: string; ruleId: string; disasterPhase: string; field: string; operator: Operator; threshold: unknown; approvedAction: string; whyItApplies: string; sourceAgency: string; sourceDocument: string; targetAudience: string; responsibleUnit: string; requiresLguConfirmation: boolean; version: string; activeStatus: boolean; }
 const blocked = [/evacuation order/i, /evacuation route/i, /\barea is safe\b/i, /automatically allocate/i, /infrastructure project/i];
 function matches(actual: unknown, operator: Operator, expected: unknown) {
   switch (operator) {
