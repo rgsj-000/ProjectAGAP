@@ -1,0 +1,2 @@
+import{z}from"zod";import{fail,ok}from"@/lib/server/errors";import{requireLguUser}from"@/lib/server/auth";import{explainWithGemini}from"@/lib/server/gemini";
+const schema=z.object({task:z.enum(["EXPLAIN_RISK","SIMPLIFY","TRANSLATE","SUMMARIZE_POST_IMPACT"]),verifiedInput:z.record(z.unknown()),language:z.enum(["en","fil"]).default("en")});export async function POST(r:Request){try{await requireLguUser();const v=schema.parse(await r.json());return ok(await explainWithGemini(v))}catch(e){return fail(e)}}

@@ -1,0 +1,1 @@
+import{describe,expect,it}from"vitest";import{calculateCapacityGap}from"./capacityEngine";describe("capacity gap",()=>{for(const[exposure,capacity,gap]of[[100,80,20],[100,100,0],[80,100,-20]])it(`returns ${gap}`,()=>expect(calculateCapacityGap({estimatedExposure:exposure,validatedCapacity:capacity,confidence:"HIGH",evidence:[]}).capacityGap).toBe(gap))});

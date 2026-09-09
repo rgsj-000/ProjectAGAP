@@ -1,0 +1,2 @@
+import{fail,ok}from"@/lib/server/errors";import{requireLguUser}from"@/lib/server/auth";
+export async function GET(r:Request){try{const{supabase}=await requireLguUser(["admin","lgu_reviewer"]);const limit=Math.min(Number(new URL(r.url).searchParams.get("limit")??50),200);const{data,error}=await supabase.from("audit_logs").select("*").order("timestamp",{ascending:false}).limit(limit);if(error)throw error;return ok(data)}catch(e){return fail(e)}}
