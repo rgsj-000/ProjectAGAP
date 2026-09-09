@@ -59,6 +59,8 @@ export async function POST(request: Request) {
         level: v.sourceCoverageLevel,
         areas: v.sourceAffectedAreas,
       },
+      sourceMessage: v.message ?? null,
+      sourcePrecautions: v.precautions ?? [],
       resolvedApplicability: {
         barangays: applicableBarangays,
         resolvedAt: new Date().toISOString(),
