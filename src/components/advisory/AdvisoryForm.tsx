@@ -871,7 +871,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
         )}
         <button
           type="submit"
-          disabled={isSaving}
+          disabled={isSaving || isExtracting}
           className="min-h-11 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSaving ? copy.saving : copy.save}
