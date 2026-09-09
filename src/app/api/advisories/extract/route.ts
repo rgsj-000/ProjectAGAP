@@ -6,12 +6,14 @@ export const runtime = "nodejs";
 
 const MAX_ADVISORY_FILE_BYTES = 6 * 1024 * 1024;
 
-const MIME_BY_EXTENSION = new Map([
+type AdvisoryMimeType = "application/pdf" | "image/png" | "image/jpeg";
+
+const MIME_BY_EXTENSION = new Map<string, AdvisoryMimeType>([
   ["pdf", "application/pdf"],
   ["png", "image/png"],
   ["jpg", "image/jpeg"],
   ["jpeg", "image/jpeg"],
-] as const);
+]);
 
 function fileExtension(name: string) {
   return name.includes(".") ? name.split(".").pop()?.toLowerCase() ?? "" : "";
