@@ -128,9 +128,20 @@ export function OperationalWorkspace() {
   const [auditRows, setAuditRows] = useState<Row[]>([]);
   const [offline, setOffline] = useState(false);
   const [showAdvisory, setShowAdvisory] = useState(false);
+  const [reviewAdvisoryId, setReviewAdvisoryId] = useState("");
+  const [reviewEvidenceUrl, setReviewEvidenceUrl] = useState("");
+  const [reviewReason, setReviewReason] = useState("");
   const reviewer = data?.role === "admin" || data?.role === "lgu_reviewer";
   const barangay = data?.barangays.find((b: Row) => b.id === barangayId);
   const advisory = data?.advisories.find((a: Row) => a.id === advisoryId);
+  const pendingAdvisories =
+    data?.advisories.filter((a: Row) =>
+      ["FOR_REVIEW", "UNVERIFIED"].includes(a.verification_status),
+    ) ?? [];
+  const reviewAdvisory =
+    data?.advisories.find((a: Row) => a.id === reviewAdvisoryId) ??
+    pendingAdvisories[0] ??
+    null;
   const rowTime = (value: unknown) => {
     const parsed = Date.parse(String(value ?? ""));
     return Number.isNaN(parsed) ? 0 : parsed;
@@ -526,6 +537,198 @@ export function OperationalWorkspace() {
       )}
       {view === "home" && (
         <>
+          {reviewer && (
+            <Section title="Pending advisory verification">
+              <p className="text-sm text-slate-600">
+                Verify each official advisory once. Confirm the uploaded source,
+                extracted fields, source geographic coverage, and the resolved
+                Lucena City barangay applicability before approval.
+              </p>
+
+              {pendingAdvisories.length === 0 ? (
+                <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">
+                  No advisories are waiting for verification.
+                </p>
+              ) : (
+                <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+                  <div className="space-y-2">
+                    {pendingAdvisories.map((item: Row) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setReviewAdvisoryId(item.id);
+                          setReviewEvidenceUrl("");
+                          setReviewReason("");
+                        }}
+                        className={`w-full rounded-xl border p-3 text-left text-sm transition-colors ${
+                          reviewAdvisory?.id === item.id
+                            ? "border-blue-400 bg-blue-50"
+                            : "border-slate-200 bg-white hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="block font-bold text-slate-900">
+                          {item.bulletin_reference}
+                        </span>
+                        <span className="mt-1 block text-xs text-slate-600">
+                          {item.source_agency} · {item.verification_status}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {reviewAdvisory && (
+                    <div className="space-y-4 rounded-2xl border border-slate-200 p-4">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-blue-700">
+                          Source record
+                        </p>
+                        <h3 className="mt-1 font-bold text-slate-900">
+                          {reviewAdvisory.advisory_type} ·{" "}
+                          {reviewAdvisory.bulletin_reference}
+                        </h3>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-xl bg-slate-50 p-3">
+                          <p className="text-xs font-bold text-slate-700">
+                            Source geographic coverage
+                          </p>
+                          <p className="mt-1 text-sm">
+                            {reviewAdvisory.raw_content?.sourceCoverage?.level ??
+                              "Not recorded"}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-600">
+                            {(reviewAdvisory.raw_content?.sourceCoverage?.areas ?? []).join(
+                              ", ",
+                            ) || "No source areas recorded"}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl bg-slate-50 p-3">
+                          <p className="text-xs font-bold text-slate-700">
+                            Resolved AGAP applicability
+                          </p>
+                          <p className="mt-1 text-sm">
+                            {reviewAdvisory.affected_areas?.length
+                              ? `${reviewAdvisory.affected_areas.length} Lucena City barangay(s)`
+                              : "No Lucena City barangays matched"}
+                          </p>
+                          <p className="mt-1 max-h-24 overflow-auto text-xs text-slate-600">
+                            {reviewAdvisory.affected_areas?.join(", ") ||
+                              "This official advisory may be outside the current LGU jurisdiction."}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 p-3">
+                        <p className="text-xs font-bold text-slate-700">
+                          Extracted warning information
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+                          {reviewAdvisory.warning_information}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          disabled={busy || offline}
+                          onClick={() =>
+                            void run(async () => {
+                              const result = await api<{ url: string }>(
+                                `/api/advisories/${reviewAdvisory.id}/evidence`,
+                              );
+                              setReviewEvidenceUrl(result.url);
+                            }, "Uploaded evidence opened for review.")
+                          }
+                        >
+                          Load uploaded evidence
+                        </Button>
+                        <a
+                          href={reviewAdvisory.source_link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                        >
+                          Open official source
+                        </a>
+                      </div>
+
+                      {reviewEvidenceUrl && (
+                        <iframe
+                          src={reviewEvidenceUrl}
+                          title="Uploaded advisory evidence"
+                          className="h-[520px] w-full rounded-xl border border-slate-200 bg-white"
+                        />
+                      )}
+
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                        <p className="text-xs font-bold text-amber-900">
+                          Reviewer confirmation
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-amber-800">
+                          Verify only after the uploaded file and official source
+                          support the extracted facts and the geographic
+                          applicability shown above.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          disabled={busy || offline}
+                          onClick={() =>
+                            void run(async () => {
+                              await post(
+                                `/api/advisories/${reviewAdvisory.id}/verify`,
+                                {},
+                              );
+                              setReviewEvidenceUrl("");
+                              setReviewAdvisoryId("");
+                              await load();
+                            }, "Advisory verified once for all resolved barangays.")
+                          }
+                        >
+                          Verify advisory
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2 border-t border-slate-200 pt-3">
+                        <label className="block text-sm font-medium text-slate-700">
+                          Return for correction
+                          <textarea
+                            className={`${inputClass} min-h-24`}
+                            value={reviewReason}
+                            onChange={(e) => setReviewReason(e.target.value)}
+                            placeholder="State what must be corrected before verification."
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          disabled={busy || offline || reviewReason.trim().length < 5}
+                          onClick={() =>
+                            void run(async () => {
+                              await post(
+                                `/api/advisories/${reviewAdvisory.id}/return`,
+                                { reason: reviewReason.trim() },
+                              );
+                              setReviewEvidenceUrl("");
+                              setReviewAdvisoryId("");
+                              setReviewReason("");
+                              await load();
+                            }, "Advisory returned for correction.")
+                          }
+                          className="min-h-11 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-900 disabled:opacity-50"
+                        >
+                          Return for correction
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Section>
+          )}
+
           <Section title="Advisory intake & verification">
             {advisory ? (
               <>
@@ -560,23 +763,19 @@ export function OperationalWorkspace() {
               >
                 Enter advisory
               </Button>
-              <Button
-                disabled={
-                  !reviewer ||
-                  busy ||
-                  offline ||
-                  !advisory ||
-                  advisory.verification_status === "VERIFIED"
-                }
-                onClick={() =>
-                  void run(async () => {
-                    await post(`/api/advisories/${advisoryId}/verify`, {});
-                    await load();
-                  }, "Advisory verified and audit recorded.")
-                }
-              >
-                Verify source & advisory
-              </Button>
+              {reviewer && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReviewAdvisoryId(advisoryId);
+                    setReviewEvidenceUrl("");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="min-h-11 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-800"
+                >
+                  Review in verification queue
+                </button>
+              )}
               <Button onClick={() => setCurrentModule("prepare")}>
                 Open assessment
               </Button>
@@ -603,7 +802,7 @@ export function OperationalWorkspace() {
                   await load();
                   setShowAdvisory(false);
                   setMessage(
-                    "Advisory saved as unverified. A reviewer must verify it before assessment.",
+                    "Advisory submitted for review. It will apply to resolved barangays only after an authorized reviewer verifies it.",
                   );
                 }}
               />

@@ -1,16 +1,22 @@
-import { uuid } from "@/lib/server/validation";
+import { z } from "zod";
 import { fail, ok } from "@/lib/server/errors";
 import { requireLguUser } from "@/lib/server/auth";
 import { audit } from "@/lib/server/audit";
+import { uuid } from "@/lib/server/validation";
+
+const input = z.object({
+  reason: z.string().trim().min(5).max(1000),
+});
 
 export async function POST(
-  _: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
   const params = await context.params;
   try {
     uuid.parse(params.id);
     const { supabase, user } = await requireLguUser(["admin", "lgu_reviewer"]);
+    const { reason } = input.parse(await request.json());
 
     const { data: old, error: oldError } = await supabase
       .from("advisories")
@@ -27,16 +33,16 @@ export async function POST(
     const { data, error } = await supabase
       .from("advisories")
       .update({
-        verification_status: "VERIFIED",
-        verified_by: user.id,
-        verified_at: new Date().toISOString(),
+        verification_status: "REJECTED",
+        verified_by: null,
+        verified_at: null,
         raw_content: {
           ...rawContent,
           review: {
-            status: "VERIFIED",
+            status: "REJECTED",
+            reason,
             reviewedBy: user.id,
             reviewedAt: new Date().toISOString(),
-            applicabilityConfirmed: true,
           },
         },
       })
@@ -47,7 +53,7 @@ export async function POST(
 
     await audit(supabase, {
       userId: user.id,
-      action: "VERIFICATION",
+      action: "MODIFICATION",
       entityType: "advisory",
       entityId: params.id,
       oldValue: old,
