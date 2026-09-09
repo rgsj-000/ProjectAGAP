@@ -7,6 +7,7 @@ const fieldKeys = [
   "issuedTime",
   "bulletinNumber",
   "validity",
+  "coverageLevel",
   "affectedLocations",
   "warningInformation",
   "sourceUrl",
@@ -22,6 +23,7 @@ const modelExtraction = z.object({
   issuedTime: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).nullable(),
   bulletinNumber: nullableText,
   validity: z.string().trim().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/).nullable(),
+  coverageLevel: z.enum(["PROVINCE","CITY_MUNICIPALITY","BARANGAY","SPECIFIC_AREA"]).nullable(),
   affectedLocations: z.array(z.string().trim().min(1).max(300)).max(100),
   warningInformation: nullableText,
   sourceUrl: z.string().trim().url().nullable(),
@@ -39,6 +41,7 @@ export interface AdvisoryExtractionResult {
     issuedTime: string | null;
     bulletinNumber: string | null;
     validity: string | null;
+    coverageLevel: "PROVINCE" | "CITY_MUNICIPALITY" | "BARANGAY" | "SPECIFIC_AREA" | null;
     affectedLocations: string[];
     warningInformation: string | null;
     sourceUrl: string | null;
@@ -81,6 +84,7 @@ export function normalizeAdvisoryExtraction(raw: unknown): AdvisoryExtractionRes
     issuedTime: parsed.issuedTime,
     bulletinNumber: parsed.bulletinNumber,
     validity: parsed.validity,
+    coverageLevel: parsed.coverageLevel,
     affectedLocations: parsed.affectedLocations,
     warningInformation: parsed.warningInformation,
     sourceUrl: parsed.sourceUrl,
@@ -132,6 +136,7 @@ export async function extractAdvisoryWithGemini(input: {
     "message must be a concise extractive summary of the advisory content only. Do not add instructions.",
     "precautions must contain only directives or precautions explicitly stated by the issuing source.",
     "affectedLocations must list only locations explicitly named by the source.",
+    "coverageLevel must describe the geographic level explicitly supported by those locations: PROVINCE, CITY_MUNICIPALITY, BARANGAY, or SPECIFIC_AREA. Return null if uncertain.",
     "Return JSON only with exactly these keys:",
     JSON.stringify({
       title: "string|null",
@@ -139,6 +144,7 @@ export async function extractAdvisoryWithGemini(input: {
       issuedTime: "YYYY-MM-DDTHH:mm|null",
       bulletinNumber: "string|null",
       validity: "YYYY-MM-DDTHH:mm|null",
+      coverageLevel: "PROVINCE|CITY_MUNICIPALITY|BARANGAY|SPECIFIC_AREA|null",
       affectedLocations: ["string"],
       warningInformation: "string|null",
       sourceUrl: "https://...|null",
