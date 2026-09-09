@@ -74,10 +74,10 @@ export const AppSidebar: React.FC = () => {
         >
           <div className="space-y-2">
             <ProjectAgapBrand
-              width={176}
-              height={52}
+              width={230}
+              height={70}
               priority
-              className="h-auto max-h-11 w-auto max-w-full"
+              className="h-auto max-h-14 w-auto max-w-full xl:max-h-16"
             />
             <span className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
               <MapPin className="h-3 w-3 shrink-0 text-slate-400" />

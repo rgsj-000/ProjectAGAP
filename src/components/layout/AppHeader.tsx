@@ -92,13 +92,13 @@ export const AppHeader: React.FC = () => {
   return (
     <header className="sticky top-0 z-20 w-full bg-white border-b border-slate-200">
       {/* Mobile Top Header */}
-      <div className="flex lg:hidden items-center justify-between px-4 py-2.5 min-h-[52px]">
+      <div className="flex lg:hidden items-center justify-between px-4 py-2.5 min-h-[60px] sm:min-h-[64px]">
         <div className="flex min-w-0 items-center gap-2">
           <ProjectAgapBrand
-            width={110}
-            height={34}
+            width={160}
+            height={48}
             priority
-            className="h-7 w-auto shrink-0"
+            className="h-8 w-auto shrink-0 sm:h-9 md:h-10"
           />
           <span className="hidden text-[11px] font-medium text-slate-400 sm:inline">
             • {isBarangayUser
