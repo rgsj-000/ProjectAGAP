@@ -10,6 +10,12 @@ const output = z.object({
 
 const GEMINI_TIMEOUT_MS = 60_000;
 
+function resolveGeminiModel() {
+  const configured = process.env.GEMINI_MODEL?.trim();
+  if (!configured || configured === "gemini-2.5-flash") return "gemini-3.6-flash";
+  return configured;
+}
+
 function failureMetadata(error: unknown) {
   if (error instanceof Error && error.name === "AbortError") {
     return { category: "timeout", stage: "request_timeout" };
@@ -47,7 +53,7 @@ export async function explainWithGemini(input: {
 }) {
   const startedAt = Date.now();
   const key = process.env.GEMINI_API_KEY;
-  const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
+  const model = resolveGeminiModel();
 
   if (!key) {
     const details = { reason: "unavailable", stage: "configuration", elapsedMs: Date.now() - startedAt };
