@@ -44,3 +44,11 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+@media print {
+  body.printing-agap-pack * { visibility: hidden; }
+  body.printing-agap-pack .agap-print-pack,
+  body.printing-agap-pack .agap-print-pack * { visibility: visible; }
+  body.printing-agap-pack .agap-print-pack { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; background: white; }
+  .agap-print-pack h3 { break-after: avoid; }
+  .agap-print-pack tr { break-inside: avoid; }
+}

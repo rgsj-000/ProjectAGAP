@@ -6,7 +6,7 @@ import { AppHeader } from "./AppHeader";
 import { MobileBottomNav } from "./MobileNavigation";
 import { HelpDialog } from "./HelpDialog";
 import { AdvisoryModal } from "../advisory/AdvisoryModal";
-import { ModulePlaceholder } from "../modules/ModulePlaceholder";
+import { OperationalWorkspace } from "../modules/OperationalWorkspace";
 import { PublicHouseholdView } from "../public/PublicHouseholdView";
 import { useNavigation } from "@/context/NavigationContext";
 
@@ -30,7 +30,7 @@ export const AppShell: React.FC = () => {
           tabIndex={-1}
           className="flex-1 px-4 sm:px-8 lg:px-12 py-6 sm:py-8 max-w-4xl w-full mx-auto outline-hidden"
         >
-          <ModulePlaceholder />
+          <OperationalWorkspace />
         </main>
       </div>
 

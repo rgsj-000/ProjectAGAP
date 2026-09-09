@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { NavigationProvider } from "@/context/NavigationContext";
+import { OfflineRegistration } from "@/components/feedback/OfflineRegistration";
 
 export const metadata: Metadata = {
   title: "PROJECT AGAP — AI-Guided Assessment and Prioritization (Lucena City)",
@@ -25,7 +26,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="min-h-screen bg-slate-50 text-slate-900 selection:bg-blue-600 selection:text-white antialiased">
         <LanguageProvider>
-          <NavigationProvider>{children}</NavigationProvider>
+          <NavigationProvider><OfflineRegistration />{children}</NavigationProvider>
         </LanguageProvider>
       </body>
     </html>

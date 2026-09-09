@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { useLanguage } from "@/context/LanguageContext";
 import {
   type DemoUserView,
@@ -174,6 +175,14 @@ export const UserProfileArea: React.FC<UserProfileAreaProps> = ({
                   : "Lumipat sa iba't ibang demo access view"}
               </p>
             </div>
+
+            <Link
+              href="/login"
+              onClick={() => setIsDropdownOpen(false)}
+              className="my-1 flex items-center rounded-lg bg-slate-900 px-3 py-2.5 text-xs font-bold text-white transition-colors hover:bg-slate-800"
+            >
+              Sign in with Supabase
+            </Link>
 
             <div className="space-y-1 py-1">
               {AVAILABLE_ROLES.map((role) => {

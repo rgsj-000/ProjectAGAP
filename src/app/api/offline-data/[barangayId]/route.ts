@@ -1,3 +1,19 @@
-import { uuid } from "@/lib/server/validation"; import { fail, ok } from "@/lib/server/errors"; import { requireLguUser } from "@/lib/server/auth";
-export async function GET(_:Request,context:{params:Promise<{barangayId:string}>}){const params=await context.params;try{uuid.parse(params.barangayId);const{supabase}=await requireLguUser();const now=new Date().toISOString();const [b,a,r,e,p,f,rules,cards,conflicts,pending]=await Promise.all([supabase.from("barangays").select("id,psgc_code,city,barangay_name,population,source,reference_year").eq("id",params.barangayId).single(),supabase.from("advisories").select("*").eq("verification_status","VERIFIED").gt("validity_end",now).order("issue_time",{ascending:false}).limit(1).maybeSingle(),supabase.from("risk_assessments").select("*").eq("barangay_id",params.barangayId).order("assessment_date",{ascending:false}).limit(1).maybeSingle(),supabase.from("population_exposure_estimates").select("*").eq("barangay_id",params.barangayId).order("generated_at",{ascending:false}).limit(1).maybeSingle(),supabase.from("preparedness_capacities").select("*").eq("barangay_id",params.barangayId).order("validation_date",{ascending:false}).limit(1).maybeSingle(),supabase.from("critical_facilities").select("id,name,type,operational_status,capacity,last_validation_date,source").eq("barangay_id",params.barangayId),supabase.from("action_rules").select("*").eq("active_status",true),supabase.from("generated_outputs").select("*").eq("reference_id",params.barangayId).order("generated_at",{ascending:false}).limit(10),baseCount(supabase,"sync_conflicts","status","ACTION_REQUIRED"),supabase.from("damage_reports").select("id",{count:"exact",head:true}).eq("sync_status","PENDING_SYNC")]);for(const x of[b,a,r,e,p,f,rules,cards,pending])if(x.error)throw x.error;return ok({advisory:a.data,barangay:b.data,riskAssessment:r.data,exposureEstimate:e.data,preparednessCapacity:p.data,criticalFacilities:f.data,approvedActionRules:rules.data,generatedCards:cards.data,synchronization:{status:"ONLINE",lastSyncAt:new Date().toISOString(),sourceDate:a.data?.issue_time??null,advisoryValidity:a.data?.validity_end??null,staleData:!a.data,pendingSyncCount:pending.count??0,conflictCount:conflicts}})}catch(e){return fail(e)}}
-async function baseCount(s:any,table:string,column:string,value:string){const{count,error}=await s.from(table).select("id",{count:"exact",head:true}).eq(column,value);if(error)throw error;return count??0}
+import { uuid } from "@/lib/server/validation";
+import { fail, ok } from "@/lib/server/errors";
+import { requireLguUser } from "@/lib/server/auth";
+import { activeVerifiedAdvisory, activeRules } from "@/lib/server/repositories";
+export async function GET(_:Request,ctx:{params:Promise<{barangayId:string}>}) {
+ try {const {barangayId}=await ctx.params;uuid.parse(barangayId);const {supabase}=await requireLguUser();
+ const {data:barangay,error:be}=await supabase.from("barangays").select("id,psgc_code,city,barangay_name,population,source,reference_year").eq("id",barangayId).single();if(be)throw be;
+ const advisory=await activeVerifiedAdvisory(supabase,barangay.barangay_name);
+ const [risk,exposure,capacity,facilities,cards,methods]=await Promise.all([
+ supabase.from("risk_assessments").select("*").eq("barangay_id",barangayId).eq("advisory_id",advisory.id).order("assessment_date",{ascending:false}),
+ supabase.from("population_exposure_estimates").select("*").eq("barangay_id",barangayId).order("generated_at",{ascending:false}),
+ supabase.from("preparedness_capacities").select("*").eq("barangay_id",barangayId).order("validation_date",{ascending:false}),
+ supabase.from("critical_facilities").select("id,name,type,operational_status,capacity,last_validation_date,source").eq("barangay_id",barangayId),
+ supabase.from("generated_outputs").select("*").eq("reference_id",barangayId).order("generated_at",{ascending:false}).limit(10),
+ supabase.from("methodologies").select("*").eq("active_status",true)]);
+ for(const result of [risk,exposure,capacity,facilities,cards,methods])if(result.error)throw result.error;
+ return ok({barangay,advisory,riskAssessments:risk.data,exposureEstimates:exposure.data,preparednessCapacities:capacity.data,criticalFacilities:facilities.data,generatedCards:cards.data,methodologies:methods.data,approvedActionRules:await activeRules(supabase),synchronization:{lastSyncAt:new Date().toISOString(),sourceDate:advisory.issue_time,advisoryValidity:advisory.validity_end,staleData:false}});
+ }catch(e){return fail(e);}
+}

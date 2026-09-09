@@ -1,4 +1,4 @@
-import { AppError } from "../server/errors";
+import { DomainError as AppError } from "./errors";
 
 export interface Methodology {
   name: string; version: string; likelihoodScale: { min: number; max: number };

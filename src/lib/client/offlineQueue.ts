@@ -1,8 +1,110 @@
-import{openDB,type DBSchema}from"idb";
-export interface PendingFieldReport{clientId:string;deviceTimestamp:string;status:"PENDING_SYNC"|"SYNCING"|"ACTION_REQUIRED";payload:Record<string,unknown>;lastError?:string}
-interface AgapDb extends DBSchema{reports:{key:string;value:PendingFieldReport;indexes:{"by-status":string}};packs:{key:string;value:{barangayId:string;savedAt:string;data:unknown}}}
-const db=()=>openDB<AgapDb>("project-agap-offline",1,{upgrade(d){const reports=d.createObjectStore("reports",{keyPath:"clientId"});reports.createIndex("by-status","status");d.createObjectStore("packs",{keyPath:"barangayId"})}});
-export async function queueFieldReport(payload:Record<string,unknown>){const clientId=crypto.randomUUID();const item:PendingFieldReport={clientId,deviceTimestamp:new Date().toISOString(),status:"PENDING_SYNC",payload};await(await db()).put("reports",item);return item}
-export async function pendingReports(){return(await db()).getAllFromIndex("reports","by-status","PENDING_SYNC")}
-export async function syncPendingReports(){const database=await db();const items=await pendingReports();if(!navigator.onLine||items.length===0)return{status:navigator.onLine?"ONLINE":"OFFLINE",pendingSyncCount:items.length,conflictCount:0};items.forEach(i=>{i.status="SYNCING"});await Promise.all(items.map(i=>database.put("reports",i)));try{const response=await fetch("/api/sync",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({records:items.map(i=>({...i.payload,clientId:i.clientId,deviceTimestamp:i.deviceTimestamp}))})});const result=await response.json();if(!response.ok)throw new Error(result.error?.message??"Sync failed");for(const entry of result.data.results){if(entry.status==="SYNCED")await database.delete("reports",entry.clientId);else{const item=items.find(i=>i.clientId===entry.clientId);if(item)await database.put("reports",{...item,status:"ACTION_REQUIRED"})}}return{status:result.data.conflictCount?"ACTION_REQUIRED":"ONLINE",pendingSyncCount:(await pendingReports()).length,conflictCount:result.data.conflictCount,lastSyncAt:result.data.lastSyncAt}}catch(error){for(const item of items)await database.put("reports",{...item,status:"PENDING_SYNC",lastError:String(error)});throw error}}
-export async function cacheOfflinePack(barangayId:string,data:unknown){await(await db()).put("packs",{barangayId,savedAt:new Date().toISOString(),data})}
+import { openDB } from "idb";
+export interface PendingFieldReport {
+  clientId: string;
+  ownerId: string;
+  deviceTimestamp: string;
+  status: "PENDING_SYNC" | "SYNCING" | "ACTION_REQUIRED";
+  payload: Record<string, unknown>;
+  lastError?: string;
+}
+const db = () =>
+  openDB("project-agap-offline", 2, {
+    upgrade(d) {
+      if (!d.objectStoreNames.contains("reports")) {
+        const s = d.createObjectStore("reports", { keyPath: "clientId" });
+        s.createIndex("by-status", "status");
+      }
+      if (!d.objectStoreNames.contains("packs"))
+        d.createObjectStore("packs", { keyPath: "barangayId" });
+    },
+  });
+const changed = () => window.dispatchEvent(new Event("agap-sync"));
+export async function cacheOfflinePack(key: string, data: unknown) {
+  await (
+    await db()
+  ).put("packs", { barangayId: key, savedAt: new Date().toISOString(), data });
+}
+export async function readOfflinePack<T = any>(
+  key: string,
+): Promise<{ savedAt: string; data: T } | undefined> {
+  return (await db()).get("packs", key);
+}
+export async function queueFieldReport(
+  payload: Record<string, unknown>,
+  ownerId: string,
+) {
+  const clientId = crypto.randomUUID();
+  const deviceTimestamp = new Date().toISOString();
+  const item: PendingFieldReport = {
+    clientId,
+    ownerId,
+    deviceTimestamp,
+    status: "PENDING_SYNC",
+    payload: { ...payload, clientId, deviceTimestamp },
+  };
+  await (await db()).put("reports", item);
+  changed();
+  return item;
+}
+export async function pendingReports(
+  ownerId?: string,
+): Promise<PendingFieldReport[]> {
+  return (await (await db()).getAll("reports")).filter(
+    (r: PendingFieldReport) => r.ownerId === ownerId,
+  );
+}
+let activeSync: Promise<void> | null = null;
+export function syncPendingReports(ownerId: string): Promise<void> {
+  if (activeSync) return activeSync;
+  activeSync = sync(ownerId).finally(() => {
+    activeSync = null;
+    changed();
+  });
+  return activeSync;
+}
+async function sync(ownerId: string) {
+  if (!navigator.onLine) return;
+  const database = await db();
+  const items = (await pendingReports(ownerId)).filter(
+    (r) => r.status !== "ACTION_REQUIRED",
+  );
+  for (const item of items) {
+    await database.put("reports", { ...item, status: "SYNCING" });
+    changed();
+    try {
+      const response = await fetch("/api/sync", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ records: [item.payload] }),
+      });
+      const result = await response.json();
+      if (!response.ok)
+        throw new Error(result.error?.message ?? "Synchronization failed");
+      const entry = result.data.results[0];
+      if (entry?.status === "SYNCED")
+        await database.delete("reports", item.clientId);
+      else
+        await database.put("reports", {
+          ...item,
+          status: "ACTION_REQUIRED",
+          lastError:
+            "Conflicting server record. Ask an LGU reviewer to resolve it.",
+        });
+    } catch (e) {
+      await database.put("reports", {
+        ...item,
+        status: "PENDING_SYNC",
+        lastError: String(e),
+      });
+      throw e;
+    }
+  }
+  await cacheOfflinePack(`sync:${ownerId}`, {
+    lastSyncAt: new Date().toISOString(),
+  });
+}
+export async function clearResolvedLocalConflict(clientId: string) {
+  const database = await db();
+  await database.delete("reports", clientId);
+  changed();
+}
