@@ -8,7 +8,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useNavigation } from "@/context/NavigationContext";
-import { api, saveAdvisory } from "@/lib/client/api";
+import { api, deleteAdvisory, saveAdvisory, updateAdvisory } from "@/lib/client/api";
 import { createSupabaseBrowserClient as createBrowserClient } from "@/lib/client/supabase";
 import {
   cacheOfflinePack,
@@ -128,12 +128,33 @@ export function OperationalWorkspace() {
   const [auditRows, setAuditRows] = useState<Row[]>([]);
   const [offline, setOffline] = useState(false);
   const [showAdvisory, setShowAdvisory] = useState(false);
+  const [editingAdvisoryId, setEditingAdvisoryId] = useState("");
   const [reviewAdvisoryId, setReviewAdvisoryId] = useState("");
   const [reviewEvidenceUrl, setReviewEvidenceUrl] = useState("");
   const [reviewReason, setReviewReason] = useState("");
   const reviewer = data?.role === "admin" || data?.role === "lgu_reviewer";
   const barangay = data?.barangays.find((b: Row) => b.id === barangayId);
   const advisory = data?.advisories.find((a: Row) => a.id === advisoryId);
+  const editingAdvisory = data?.advisories.find((a: Row) => a.id === editingAdvisoryId);
+  const advisoryInitialValues = editingAdvisory
+    ? {
+        title: editingAdvisory.advisory_type,
+        source: editingAdvisory.source_agency,
+        issuedTime: editingAdvisory.issue_time,
+        bulletinNumber: editingAdvisory.bulletin_reference,
+        validity: editingAdvisory.validity_end,
+        coverageLevel:
+          editingAdvisory.raw_content?.sourceCoverage?.level ?? "SPECIFIC_AREA",
+        affectedLocations:
+          editingAdvisory.raw_content?.sourceCoverage?.areas?.join(", ") ??
+          editingAdvisory.affected_areas?.join(", ") ??
+          "",
+        warningInformation: editingAdvisory.warning_information,
+        sourceUrl: editingAdvisory.source_link,
+        message: editingAdvisory.raw_content?.sourceMessage ?? "",
+        precautions: editingAdvisory.raw_content?.sourcePrecautions ?? [""],
+      }
+    : undefined;
   const pendingAdvisories =
     data?.advisories.filter((a: Row) =>
       ["FOR_REVIEW", "UNVERIFIED"].includes(a.verification_status),
@@ -785,10 +806,48 @@ export function OperationalWorkspace() {
                 disabled={
                   busy || offline || data.role === "field_reporter" || isFieldResponderUser
                 }
-                onClick={() => setShowAdvisory(!showAdvisory)}
+                onClick={() => {
+                  setEditingAdvisoryId("");
+                  setShowAdvisory(!showAdvisory);
+                }}
               >
-                Upload / enter advisory
+                Create advisory
               </Button>
+              {advisory && data.role !== "field_reporter" && !isFieldResponderUser && (
+                <button
+                  type="button"
+                  disabled={busy || offline}
+                  onClick={() => {
+                    setEditingAdvisoryId(advisory.id);
+                    setShowAdvisory(true);
+                  }}
+                  className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50"
+                >
+                  Edit advisory
+                </button>
+              )}
+              {advisory && data.role === "admin" && (
+                <button
+                  type="button"
+                  disabled={busy || offline}
+                  onClick={() =>
+                    void run(async () => {
+                      const confirmed = window.confirm(
+                        `Delete ${advisory.bulletin_reference}? Advisories already used by assessments or incident records cannot be deleted.`,
+                      );
+                      if (!confirmed) throw new Error("Deletion cancelled.");
+                      await deleteAdvisory(advisory.id);
+                      setAdvisoryId("");
+                      setEditingAdvisoryId("");
+                      setShowAdvisory(false);
+                      await load();
+                    }, "Advisory deleted.")
+                  }
+                  className="min-h-11 rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 disabled:opacity-50"
+                >
+                  Delete advisory
+                </button>
+              )}
               {reviewer && (
                 <button
                   type="button"
@@ -808,7 +867,12 @@ export function OperationalWorkspace() {
             </div>
             {showAdvisory && (
               <AdvisoryForm
-                onCancel={() => setShowAdvisory(false)}
+                key={editingAdvisoryId || "create-advisory"}
+                initialValues={advisoryInitialValues}
+                onCancel={() => {
+                  setShowAdvisory(false);
+                  setEditingAdvisoryId("");
+                }}
                 onSave={async (values, file) => {
                   let evidence: unknown;
                   if (file) {
@@ -824,15 +888,21 @@ export function OperationalWorkspace() {
                       throw new Error(result.error?.message ?? "Upload failed");
                     evidence = result.data;
                   }
-                  const saved = await saveAdvisory(values, evidence) as Row;
+                  const saved = editingAdvisoryId
+                    ? (await updateAdvisory(editingAdvisoryId, values, evidence) as Row)
+                    : (await saveAdvisory(values, evidence) as Row);
                   await load();
                   setShowAdvisory(false);
+                  setEditingAdvisoryId("");
+                  setAdvisoryId(saved.id);
                   if (reviewer) {
                     setReviewAdvisoryId(saved.id);
                     setReviewEvidenceUrl("");
                     setReviewReason("");
                     setMessage(
-                      "Advisory submitted. Review the uploaded evidence and click Verify advisory to activate it.",
+                      editingAdvisoryId
+                        ? "Advisory updated and returned to FOR REVIEW. Review the source again before verification."
+                        : "Advisory submitted. Review the uploaded evidence and click Verify advisory to activate it.",
                     );
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   } else {
