@@ -108,7 +108,12 @@ const str = (v: unknown) =>
       : String(v);
 
 export function OperationalWorkspace() {
-  const { currentModule, prepareSubView, setCurrentModule } = useNavigation();
+  const {
+    currentModule,
+    prepareSubView,
+    setCurrentModule,
+    isFieldResponderUser,
+  } = useNavigation();
   const [data, setData] = useState<Workspace | null>(null);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -404,6 +409,18 @@ export function OperationalWorkspace() {
         </p>
       )}
       {contextSelector}
+      {view === "home" && isFieldResponderUser && (
+        <Section title="Primary field task">
+          <p className="text-sm text-slate-600">
+            Record observed damage, affected people, service disruptions, access
+            conditions, priority needs, and supporting evidence. Reports remain
+            unverified until authorized LGU review.
+          </p>
+          <Button onClick={() => setCurrentModule("report-damage")}>
+            Open damage & needs report
+          </Button>
+        </Section>
+      )}
       {advisory?.is_demo && (
         <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
           Synthetic demonstration advisory. Not official disaster information.
@@ -438,7 +455,9 @@ export function OperationalWorkspace() {
             )}
             <div className="flex flex-wrap gap-3">
               <Button
-                disabled={busy || offline || data.role === "field_reporter"}
+                disabled={
+                  busy || offline || data.role === "field_reporter" || isFieldResponderUser
+                }
                 onClick={() => setShowAdvisory(!showAdvisory)}
               >
                 Enter advisory
