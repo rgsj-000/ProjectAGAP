@@ -24,8 +24,6 @@ import { LGUActionCard } from "@/components/assessment/LGUActionCard";
 import { PostImpactActionCard } from "@/components/recovery/PostImpactActionCard";
 import { ConnectedHouseholdCard } from "@/components/household/ConnectedHouseholdCard";
 import { ConnectivityStatus } from "@/components/feedback/ConnectivityStatus";
-import { calculateRisk } from "@/lib/domain/riskEngine";
-import { assertCurrentAdvisory } from "@/lib/domain/advisory";
 import { OfflineOperationsPack } from "./OfflineOperationsPack";
 
 type Row = Record<string, any>;
@@ -125,7 +123,6 @@ export function OperationalWorkspace() {
   const [postImpact, setPostImpact] = useState<Row | null>(null);
   const [reports, setReports] = useState<Row[]>([]);
   const [actions, setActions] = useState<Row[]>([]);
-  const [localRisk, setLocalRisk] = useState<Row | null>(null);
   const [queue, setQueue] = useState<PendingFieldReport[]>([]);
   const [conflicts, setConflicts] = useState<Row[]>([]);
   const [auditRows, setAuditRows] = useState<Row[]>([]);
@@ -134,12 +131,102 @@ export function OperationalWorkspace() {
   const reviewer = data?.role === "admin" || data?.role === "lgu_reviewer";
   const barangay = data?.barangays.find((b: Row) => b.id === barangayId);
   const advisory = data?.advisories.find((a: Row) => a.id === advisoryId);
-  const capacityRecords = data?.preparedness_capacities.filter(
-    (c: Row) => c.barangay_id === barangayId,
-  ) ?? [];
-  const hasValidatedCapacity = capacityRecords.some(
-    (capacity: Row) => Boolean(capacity.validation_date),
+  const rowTime = (value: unknown) => {
+    const parsed = Date.parse(String(value ?? ""));
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+  const asList = (value: unknown) =>
+    Array.isArray(value)
+      ? value.map((item) => String(item)).filter(Boolean)
+      : value
+        ? [String(value)]
+        : [];
+  const formatCount = (value: unknown) => {
+    const number = Number(value);
+    return Number.isFinite(number)
+      ? new Intl.NumberFormat("en-PH", { maximumFractionDigits: 0 }).format(number)
+      : "Not recorded";
+  };
+  const formatRecordDate = (value: unknown) => {
+    if (!value) return "Not recorded";
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime())
+      ? String(value)
+      : new Intl.DateTimeFormat("en-PH", { dateStyle: "medium" }).format(date);
+  };
+  const selectedRisk = data
+    ? [...(data.risk_assessments ?? [])]
+        .filter(
+          (risk: Row) =>
+            risk.barangay_id === barangayId &&
+            risk.advisory_id === advisoryId,
+        )
+        .sort(
+          (a: Row, b: Row) =>
+            rowTime(b.assessment_date ?? b.data_date) -
+            rowTime(a.assessment_date ?? a.data_date),
+        )[0]
+    : undefined;
+  const selectedHazardId = selectedRisk?.hazard_id || hazardId;
+  const hazard = data?.hazards.find((h: Row) => h.id === selectedHazardId);
+  const methodology = data?.methodologies.find(
+    (m: Row) => m.id === selectedRisk?.methodology_id,
   );
+  const selectedExposure = data
+    ? [...(data.population_exposure_estimates ?? [])]
+        .filter(
+          (exposure: Row) =>
+            exposure.barangay_id === barangayId &&
+            exposure.hazard_id === selectedHazardId,
+        )
+        .sort(
+          (a: Row, b: Row) =>
+            rowTime(b.generated_at ?? b.reference_date) -
+            rowTime(a.generated_at ?? a.reference_date),
+        )[0]
+    : undefined;
+  const capacityRecords =
+    data?.preparedness_capacities.filter(
+      (capacity: Row) => capacity.barangay_id === barangayId,
+    ) ?? [];
+  const latestCapacity = [...capacityRecords]
+    .filter((capacity: Row) => Boolean(capacity.validation_date))
+    .sort(
+      (a: Row, b: Row) =>
+        rowTime(b.validation_date) - rowTime(a.validation_date),
+    )[0];
+  const hasValidatedCapacity = Boolean(latestCapacity?.validation_date);
+  const recordedCapacity = latestCapacity
+    ? Number(latestCapacity.evacuation_capacity ?? 0) +
+      Number(latestCapacity.temporary_shelter_capacity ?? 0)
+    : null;
+  const estimatedExposure = selectedExposure
+    ? Number(selectedExposure.estimated_exposed_population)
+    : null;
+  const capacityGap =
+    estimatedExposure !== null &&
+    Number.isFinite(estimatedExposure) &&
+    recordedCapacity !== null &&
+    Number.isFinite(recordedCapacity)
+      ? estimatedExposure - recordedCapacity
+      : null;
+  const assessmentReady = Boolean(
+    selectedRisk &&
+      selectedExposure &&
+      selectedHazardId &&
+      hasValidatedCapacity,
+  );
+  const assessmentLimitations = [
+    ...asList(selectedRisk?.limitations),
+    ...asList(selectedExposure?.limitations),
+    ...asList(latestCapacity?.limitations),
+  ];
+  const riskTone: Record<string, string> = {
+    VERY_HIGH: "border-red-200 bg-red-50 text-red-800",
+    HIGH: "border-orange-200 bg-orange-50 text-orange-800",
+    MODERATE: "border-amber-200 bg-amber-50 text-amber-800",
+    LOW: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  };
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30000);
@@ -224,7 +311,6 @@ export function OperationalWorkspace() {
     setPostImpact(null);
     setActions([]);
     setReports([]);
-    setLocalRisk(null);
     if (!data?.userId || !barangayId) return;
     let current = true;
     void readOfflinePack<Row>(
@@ -268,12 +354,12 @@ export function OperationalWorkspace() {
   async function generateCard() {
     const result = await post<Row>("/api/action-cards/lgu", {
       barangayId,
-      hazardId,
+      hazardId: selectedHazardId,
       advisoryId,
     });
     setCard(result);
     await cacheOfflinePack(
-      `lgu:${data!.userId}:${barangayId}:${advisoryId}:${hazardId}`,
+      `lgu:${data!.userId}:${barangayId}:${advisoryId}:${selectedHazardId}`,
       result,
     );
     await loadActions(result.outputId);
@@ -296,6 +382,12 @@ export function OperationalWorkspace() {
             )[0]?.id ?? ""),
     );
   }, [barangayId, data]);
+  useEffect(() => {
+    const assessedHazardId = selectedRisk?.hazard_id;
+    if (assessedHazardId && assessedHazardId !== hazardId) {
+      setHazardId(assessedHazardId);
+    }
+  }, [selectedRisk?.hazard_id, hazardId]);
   const submit = (
     e: FormEvent<HTMLFormElement>,
     fn: (form: FormData) => Promise<void>,
@@ -525,241 +617,168 @@ export function OperationalWorkspace() {
             <ConnectedHouseholdCard />
           ) : (
             <>
-              <Section title="Risk, exposure & capacity">
-                <label className="block text-sm font-medium">
-                  Hazard
-                  <select
-                    value={hazardId}
-                    onChange={(e) => setHazardId(e.target.value)}
-                    className={inputClass}
-                  >
-                    {data.hazards.map((h: Row) => (
-                      <option key={h.id} value={h.id}>
-                        {h.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <form
-                  className="space-y-4"
-                  onSubmit={(e) =>
-                    submit(e, async (f) => {
-                      const input = {
-                        barangayId,
-                        advisoryId,
-                        hazardId,
-                        dataDate: f.get("dataDate"),
-                        methodologyId: f.get("methodology"),
-                        likelihood: Number(f.get("likelihood")),
-                        severity: Number(f.get("severity")),
-                        evidence: [String(f.get("evidence"))],
-                        limitations: String(f.get("limitations") || "")
-                          .split("\n")
-                          .filter(Boolean),
-                        confidenceLevel: f.get("confidence"),
-                      };
-                      if (offline) {
-                        assertCurrentAdvisory(
-                          {
-                            verificationStatus: advisory.verification_status,
-                            validityStart: advisory.validity_start,
-                            validityEnd: advisory.validity_end,
-                            affectedAreas: advisory.affected_areas,
-                          },
-                          barangay.barangay_name,
-                        );
-                        const method = data.methodologies.find(
-                          (m: Row) => m.id === input.methodologyId,
-                        );
-                        if (!method) throw new Error("No cached methodology.");
-                        const result = calculateRisk(
-                          {
-                            name: method.name,
-                            version: method.version,
-                            likelihoodScale: method.likelihood_scale,
-                            severityScale: method.severity_scale,
-                            parameters: method.parameters,
-                          },
-                          input,
-                        );
-                        setLocalRisk(result);
-                        await cacheOfflinePack(
-                          `local-risk:${data.userId}:${barangayId}`,
-                          result,
-                        );
-                      } else {
-                        await post("/api/risk-assessments", input);
-                        setLocalRisk(null);
-                        await load();
-                      }
-                    })
-                  }
-                >
-                  <label className="block text-sm font-medium">
-                    Adopted methodology
-                    <select name="methodology" className={inputClass} required>
-                      {data.methodologies
-                        .filter((m: Row) => m.active_status)
-                        .map((m: Row) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name} · {m.version} · {m.source}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Field
-                      label="Likelihood (adopted scale)"
-                      name="likelihood"
-                      type="number"
-                      min={1}
-                    />
-                    <Field
-                      label="Severity (adopted scale)"
-                      name="severity"
-                      type="number"
-                      min={1}
-                    />
+              <Section title="Risk assessment">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-blue-700">
+                      Automatically loaded from stored assessment records
+                    </p>
+                    <h3 className="mt-1 text-xl font-black text-slate-950">
+                      {hazard?.name ?? "No hazard assessment available"}
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {barangay?.barangay_name ?? "Selected barangay"} ·{" "}
+                      {advisory?.bulletin_reference ?? "No advisory selected"}
+                    </p>
                   </div>
-                  <Field
-                    label="Assessment source data date"
-                    name="dataDate"
-                    type="date"
-                  />
-                  <Field
-                    label="Verified evidence / source reference"
-                    name="evidence"
-                  />
-                  <Field
-                    label="Limitations / missing information"
-                    name="limitations"
-                    required={false}
-                  />
-                  <label className="block text-sm">
-                    Confidence
-                    <select className={inputClass} name="confidence">
-                      <option>LOW</option>
-                      <option>MEDIUM</option>
-                      <option>HIGH</option>
-                    </select>
-                  </label>
-                  <Button
-                    type="submit"
-                    disabled={!reviewer || busy || !advisoryId || stale}
+                  <span
+                    className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-bold tracking-wide ${
+                      riskTone[selectedRisk?.risk_category] ??
+                      "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}
                   >
-                    {offline
-                      ? "Calculate offline draft"
-                      : "Calculate & save assessment"}
-                  </Button>
-                </form>
-                {localRisk && (
-                  <p
-                    role="status"
-                    className="rounded-xl bg-amber-50 p-4 text-sm"
-                  >
-                    Offline draft: {localRisk.calculation} ·{" "}
-                    {localRisk.riskCategory} · {localRisk.methodologyName}{" "}
-                    {localRisk.methodologyVersion}. Cached methodology; not a
-                    newly verified server assessment.
-                  </p>
+                    {selectedRisk?.risk_category
+                      ? `${selectedRisk.risk_category} RISK`
+                      : "DATA REQUIRED"}
+                  </span>
+                </div>
+
+                {!assessmentReady ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="status">
+                    <p className="font-bold">
+                      The selected barangay and advisory do not yet have a complete stored assessment.
+                    </p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                      {!selectedRisk ? <li>No risk assessment is stored for this advisory.</li> : null}
+                      {!selectedExposure ? <li>No population exposure estimate is stored for this hazard.</li> : null}
+                      {!hasValidatedCapacity ? <li>No validated preparedness capacity record is available.</li> : null}
+                    </ul>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Likelihood</p>
+                        <p className="mt-2 text-2xl font-black text-slate-950">
+                          {selectedRisk.likelihood}
+                          <span className="ml-1 text-sm font-semibold text-slate-500">/ {methodology?.likelihood_scale?.max ?? 5}</span>
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Severity</p>
+                        <p className="mt-2 text-2xl font-black text-slate-950">
+                          {selectedRisk.severity}
+                          <span className="ml-1 text-sm font-semibold text-slate-500">/ {methodology?.severity_scale?.max ?? 5}</span>
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Risk score</p>
+                        <p className="mt-2 text-2xl font-black text-slate-950">
+                          {selectedRisk.risk_result}
+                          <span className="ml-1 text-sm font-semibold text-slate-500">/ 25</span>
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {selectedRisk.likelihood} × {selectedRisk.severity} = {selectedRisk.risk_result}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 lg:grid-cols-3">
+                      <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-blue-700">Estimated potentially exposed</p>
+                        <p className="mt-2 text-2xl font-black text-slate-950">
+                          {formatCount(selectedExposure.estimated_exposed_population)}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-600">
+                          {formatCount(selectedExposure.estimated_households)} estimated households
+                        </p>
+                        <p className="mt-2 text-xs text-slate-500">Confidence: {selectedExposure.confidence_level ?? "Not recorded"}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Recorded preparedness capacity</p>
+                        <p className="mt-2 text-2xl font-black text-slate-950">{formatCount(recordedCapacity)}</p>
+                        <p className="mt-1 text-sm text-slate-600">Validated {formatRecordDate(latestCapacity.validation_date)}</p>
+                        <p className="mt-2 text-xs text-slate-500">{latestCapacity.source}</p>
+                      </div>
+                      <div className={`rounded-xl border p-4 ${capacityGap !== null && capacityGap > 0 ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Potential capacity gap</p>
+                        <p className="mt-2 text-2xl font-black text-slate-950">{formatCount(capacityGap)}</p>
+                        <p className="mt-1 text-sm text-slate-600">
+                          {capacityGap !== null && capacityGap > 0
+                            ? "Possible shortfall requiring LGU validation"
+                            : "No positive shortfall indicated by stored values"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="rounded-xl border border-slate-200 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Adopted methodology</p>
+                        <p className="mt-2 font-semibold text-slate-900">
+                          {methodology ? `${methodology.name} · ${methodology.version}` : "Methodology record unavailable"}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-600">{methodology?.source ?? "Source not recorded"}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Assessment data</p>
+                        <p className="mt-2 font-semibold text-slate-900">Source date: {formatRecordDate(selectedRisk.data_date)}</p>
+                        <p className="mt-1 text-sm text-slate-600">
+                          Confidence: {selectedRisk.confidence_level ?? "Not recorded"} · Exposure reference: {formatRecordDate(selectedExposure.reference_date)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <details className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <summary className="cursor-pointer font-semibold text-slate-800">
+                        View evidence, methodology, and limitations
+                      </summary>
+                      <div className="mt-4 grid gap-4 text-sm text-slate-700 md:grid-cols-2">
+                        <div>
+                          <p className="font-bold text-slate-900">Evidence and sources</p>
+                          <ul className="mt-2 list-disc space-y-1 pl-5">
+                            {asList(selectedRisk.evidence).map((item) => <li key={item}>{item}</li>)}
+                            <li>Exposure source: {selectedExposure.source}</li>
+                            <li>Capacity source: {latestCapacity.source}</li>
+                            {hazard?.source ? <li>Hazard source: {hazard.source}</li> : null}
+                          </ul>
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900">Limitations</p>
+                          {assessmentLimitations.length ? (
+                            <ul className="mt-2 list-disc space-y-1 pl-5">
+                              {assessmentLimitations.map((item, index) => (
+                                <li key={`${index}:${item}`}>{item}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-2">No limitations were recorded.</p>
+                          )}
+                        </div>
+                      </div>
+                    </details>
+                  </>
                 )}
-                <details>
-                  <summary className="cursor-pointer py-3 font-semibold">
-                    Record a population-exposure estimate
-                  </summary>
-                  <p className="mb-3 text-sm text-slate-600">
-                    Use an authorized spatial result. Values remain estimates,
-                    with method, confidence and source recorded.
-                  </p>
-                  <form
-                    className="space-y-3"
-                    onSubmit={(e) =>
-                      submit(e, async (f) => {
-                        await post("/api/exposure", {
-                          barangayId,
-                          hazardId,
-                          source: f.get("source"),
-                          referenceDate: f.get("date"),
-                          population: Number(f.get("population")),
-                          households: Number(f.get("households")),
-                          [String(f.get("method"))]: Number(f.get("value")),
-                          limitations: [String(f.get("limitations"))],
-                        });
-                        await load();
-                      })
+
+                <div className="flex flex-wrap gap-3">
+                  <Button disabled={busy || offline} onClick={() => void run(load, "Latest stored assessment data loaded.")}>
+                    Refresh stored data
+                  </Button>
+                  <Button
+                    disabled={!reviewer || busy || offline || stale || !assessmentReady}
+                    onClick={() =>
+                      void run(
+                        generateCard,
+                        "Action card generated from the stored assessment, exposure, and capacity records.",
+                      )
                     }
                   >
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Field
-                        label="Population baseline"
-                        name="population"
-                        type="number"
-                        min={1}
-                      />
-                      <Field
-                        label="Household baseline"
-                        name="households"
-                        type="number"
-                        min={0}
-                      />
-                    </div>
-                    <label className="block text-sm">
-                      Method
-                      <select className={inputClass} name="method">
-                        <option value="inhabitedAreaRatio">
-                          Inhabited-area ratio (0–1, low confidence)
-                        </option>
-                        <option value="residentialBuildingRatio">
-                          Residential-building ratio (0–1)
-                        </option>
-                        <option value="populationGridIntersected">
-                          Population grid intersection (persons)
-                        </option>
-                      </select>
-                    </label>
-                    <Field
-                      label="Calculated spatial input"
-                      name="value"
-                      type="number"
-                      min={0}
-                      step="any"
-                    />
-                    <Field label="Source / spatial dataset" name="source" />
-                    <Field label="Reference date" name="date" type="date" />
-                    <Field label="Method limitations" name="limitations" />
-                    <Button
-                      type="submit"
-                      disabled={!reviewer || busy || offline}
-                    >
-                      Save exposure estimate
-                    </Button>
-                  </form>
-                </details>
-                <p className="text-sm text-slate-600">
-                  Recorded capacity:{" "}
-                  {capacityRecords
-                    .map(
-                      (c: Row) =>
-                        `${c.evacuation_capacity + c.temporary_shelter_capacity} persons; validated ${c.validation_date ?? "not yet"}; ${c.source}`,
-                    )
-                    .join(" · ") || "No validated capacity record."}
+                    Generate LGU Action Card
+                  </Button>
+                </div>
+
+                <p className="text-xs leading-relaxed text-slate-500">
+                  AGAP retrieves these values from the database for the selected barangay and advisory. Users review the evidence and result instead of reentering stored assessment data.
                 </p>
-                {!hasValidatedCapacity ? (
-                  <p className="text-sm font-medium text-amber-700" role="status">
-                    Record and validate preparedness capacity before generating an LGU action card.
-                  </p>
-                ) : null}
-                <Button
-                  disabled={!reviewer || busy || offline || stale || !hasValidatedCapacity}
-                  onClick={() =>
-                    void run(
-                      generateCard,
-                      "Action card generated, cached, and actions registered for review.",
-                    )
-                  }
-                >
-                  Generate LGU Action Card
-                </Button>
               </Section>
               {card && (
                 <>
