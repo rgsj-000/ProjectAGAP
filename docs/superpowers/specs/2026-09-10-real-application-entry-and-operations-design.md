@@ -78,6 +78,10 @@ All existing implementor workflows remain reachable through role-scoped navigati
 
 Forms may remain in `OperationalWorkspace` during this pass, but the default home module must be decision-first rather than form-first.
 
+The Preparedness module is also read-first. For the selected barangay, current verified advisory, and hazard, it resolves the latest matching risk assessment, latest matching exposure estimate, and latest validated capacity record from Supabase and displays them as one current evidence set. If those records exist, an authorized reviewer can generate the LGU Action Card without re-entering likelihood, severity, dates, evidence, confidence, exposure, or capacity.
+
+Assessment, exposure, and capacity forms remain available only through an explicit role-restricted **Record or update source data** workflow. They are used when new source information must be added or an assessment must be superseded. They are not the default Preparedness screen and are not a prerequisite when usable database records already exist. Missing records appear as named data gaps with a link to the relevant source-data workflow; the interface never uses blank forms to imply that existing records are absent.
+
 ## LGU Action Card and Gemini
 
 The existing `LGUActionCard` is strengthened as the central evidence artifact. Its primary view must make the following trace visible without requiring judges to infer it:
@@ -142,6 +146,7 @@ Submission screens state that field reports are observations and remain unverifi
 - `src/components/layout/*`: role-derived navigation and real profile presentation.
 - `src/app/api/operations/route.ts`: authenticated workspace payload including real profile and dashboard source records.
 - `src/lib/domain/operationsDashboard.ts`: pure current-advisory, priority, exposure, gap, and pending-validation selectors.
+- a focused preparedness evidence-set selector and component: read-only presentation of the current database records, with source-data maintenance opened only on request.
 - `src/components/modules/OperationalWorkspace.tsx`: existing workflow orchestration and module screens.
 - `src/components/assessment/LGUActionCard.tsx`: deterministic evidence/action presentation.
 - a focused client component adjacent to the LGU card: persisted-output Gemini controls for explanation and brief generation.
