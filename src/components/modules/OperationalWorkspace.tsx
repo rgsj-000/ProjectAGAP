@@ -1293,7 +1293,7 @@ function ConnectedPostOutput({ value }: { value: Row }) {
 function renderAiInline(text: string): ReactNode[] {
   return text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map((part, index) => {
     const match = part.match(/^\*\*(.+)\*\*$/);
-    return match ? <strong key={index}>{match[1]}</strong> : <React.Fragment key={index}>{part}</React.Fragment>;
+    return match ? <strong key={index}>{match[1]}</strong> : <span key={index}>{part}</span>;
   });
 }
 
