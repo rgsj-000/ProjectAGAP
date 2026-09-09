@@ -42,7 +42,7 @@ The Zod schemas in `src/lib/server/validation.ts` are canonical request definiti
 - `POST /api/post-impact/consolidate` — reviewer/admin; selected report IDs, barangay, advisory, reason, and explicit `nonOverlapping: true` acknowledgment.
 - `GET /api/actions?outputId=UUID` — persisted operational actions. Action changes include `responsibleUnit` and a reason.
 - `GET /api/public/preparedness` — public barangay names; add `?barangay=NAME` for current verified advisory and household-approved rules only.
-- `POST /api/ai` now accepts `outputId` and `language`; arbitrary client `verifiedInput` is no longer accepted. The route retrieves stored output and provenance itself and returns a deterministic fallback if wording is unavailable.
+- `POST /api/ai` accepts `outputId`, `language`, and optional `mode` (`explain` or `brief`); arbitrary client `verifiedInput` is never accepted. Brief mode retrieves the persisted generated output and provenance itself, and may only narrate supplied values, data gaps, and approved recommendations. It returns a deterministic fallback if wording is unavailable.
 - Conflict resolution currently accepts `KEEP_SERVER` with a reason. Client acceptance/merge must not be recorded without actually validating and applying a merge.
 
 These routes depend on migration `202609090004_complete_workflows.sql`; see [deployment and verification status](WORKFLOW-IMPLEMENTATION.md).

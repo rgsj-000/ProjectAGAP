@@ -41,4 +41,4 @@ Reported field data (always unverified)
 
 ## AI guardrail
 
-Gemini receives already-verified JSON for explanation, simplification, translation, or summarization. Its JSON is schema-validated and prohibited content is rejected. It cannot call or write the risk, exposure, capacity, verification, or rule engines.
+Gemini receives already-verified JSON for explanation, simplification, translation, or summarization. Brief mode reads only a persisted generated output and its source snapshot; it may narrate supplied facts, recorded gaps, and approved recommendations, but may not invent values or actions. Its JSON is schema-validated and prohibited content is rejected. It cannot call or write the risk, exposure, capacity, verification, or rule engines.
