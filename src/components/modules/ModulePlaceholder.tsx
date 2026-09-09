@@ -21,6 +21,7 @@ import {
   ArrowLeft,
   Check,
   CheckCircle2,
+  FileEdit,
   Radio,
   Shield,
 } from "lucide-react";
@@ -35,7 +36,9 @@ export const ModulePlaceholder: React.FC = () => {
     goToBarangayDetail,
     setIsAdvisoryModalOpen,
     isBarangayUser,
+    isFieldResponderUser,
     assignedBarangay,
+    goToReportDamage,
   } = useNavigation();
   const { language, t } = useLanguage();
 
@@ -76,7 +79,7 @@ export const ModulePlaceholder: React.FC = () => {
 
   const barangayUserName = assignedBarangay?.name ?? "Gulang-Gulang";
 
-  // Keep the Barangay Gulang-Gulang demo scoped to its assigned barangay.
+  // Keep role-specific reporting scope predictable when switching demo users.
   useEffect(() => {
     if (isBarangayUser) {
       setIsAdvisoryFormOpen(false);
@@ -86,11 +89,32 @@ export const ModulePlaceholder: React.FC = () => {
       if (!isReportSubmitted) {
         setReportStep(2);
       }
-    } else if (!isReportSubmitted) {
+
+      return;
+    }
+
+    if (isFieldResponderUser) {
+      setIsAdvisoryFormOpen(false);
+
+      if (!isReportSubmitted) {
+        // Field responders choose the barangay for every new report.
+        setReportStep(1);
+        setSelectedReportBarangay("");
+      }
+
+      return;
+    }
+
+    if (!isReportSubmitted) {
       setReportStep(1);
       setSelectedReportBarangay("");
     }
-  }, [isBarangayUser, barangayUserName, isReportSubmitted]);
+  }, [
+    isBarangayUser,
+    isFieldResponderUser,
+    barangayUserName,
+    isReportSubmitted,
+  ]);
 
   // =========================================================================
   // VIEW 1: DASHBOARD
@@ -99,7 +123,11 @@ export const ModulePlaceholder: React.FC = () => {
     const advisory = CURRENT_OFFICIAL_ADVISORY;
     const advisoryTitle = language === "en" ? advisory.titleEn : advisory.titleFil;
 
-    if (isAdvisoryFormOpen && !isBarangayUser) {
+    if (
+      isAdvisoryFormOpen &&
+      !isBarangayUser &&
+      !isFieldResponderUser
+    ) {
       return (
         <div className="animate-in fade-in duration-200">
           <AdvisoryForm
@@ -120,6 +148,120 @@ export const ModulePlaceholder: React.FC = () => {
             }}
             onCancel={() => setIsAdvisoryFormOpen(false)}
           />
+        </div>
+      );
+    }
+
+    if (isFieldResponderUser) {
+      return (
+        <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-200">
+          <header className="pt-1 sm:pt-2">
+            <div className="max-w-2xl">
+              <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-700">
+                {language === "en" ? "Field Operations" : "Field Operations"}
+              </span>
+              <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-900 sm:text-4xl">
+                PROJECT AGAP
+              </h1>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500 sm:text-base">
+                {language === "en"
+                  ? "Focused field reporting for Lucena City. Record observed damage, affected population, service disruptions, access conditions, priority needs, and supporting evidence."
+                  : "Focused field reporting para sa Lucena City. Itala ang observed damage, affected population, service disruptions, access conditions, priority needs, at supporting evidence."}
+              </p>
+            </div>
+          </header>
+
+          <section
+            aria-label={language === "en" ? "Current advisory" : "Kasalukuyang advisory"}
+            className="rounded-2xl border border-amber-200/80 bg-amber-50/50 px-4 py-4 sm:px-5"
+          >
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3.5">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-amber-200 bg-white text-amber-700">
+                  <Radio className="h-5 w-5" aria-hidden="true" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">
+                      {t("advisoryActive")}
+                    </span>
+                    <span className="text-xs text-slate-400">{advisory.source}</span>
+                  </div>
+                  <p className="mt-0.5 truncate text-sm font-bold text-slate-900 sm:text-base">
+                    {advisoryTitle}
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-500">{advisory.issuedTime}</p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAdvisoryModalOpen(true)}
+                className="min-h-[40px] shrink-0 rounded-lg border border-blue-200 bg-white px-4 py-2 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-50"
+              >
+                {t("viewAdvisory")}
+              </button>
+            </div>
+          </section>
+
+          <ConnectivityStatus
+            lastSyncAt={null}
+            advisoryValidity={null}
+            pendingSyncCount={pendingReportId ? 1 : 0}
+          />
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="max-w-2xl">
+                <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-400">
+                  {language === "en" ? "Primary Field Task" : "Primary Field Task"}
+                </span>
+                <h2 className="mt-1 text-lg font-bold text-slate-900">
+                  {language === "en" ? "Damage & Needs Reporting" : "Damage & Needs Reporting"}
+                </h2>
+                <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                  {language === "en"
+                    ? "Choose the barangay for each report, record only observed or reported information, and attach the available source or evidence. Reports remain Unverified until authorized LGU review."
+                    : "Piliin ang barangay para sa bawat report, itala lamang ang observed o reported information, at ilakip ang available source o evidence. Mananatiling Unverified ang reports hanggang sa authorized LGU review."}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={goToReportDamage}
+                className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 text-xs font-bold text-white transition-colors hover:bg-blue-700"
+              >
+                <FileEdit className="h-4 w-4" aria-hidden="true" />
+                <span>
+                  {language === "en" ? "New Damage & Needs Report" : "Bagong Damage & Needs Report"}
+                </span>
+              </button>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Verification
+                </span>
+                <p className="mt-1 text-sm font-semibold text-slate-900">Unverified until LGU review</p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Offline Reporting
+                </span>
+                <p className="mt-1 text-sm font-semibold text-slate-900">
+                  {pendingReportId ? "Pending Sync report saved locally" : "Pending Sync when saved offline"}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] leading-relaxed text-amber-900">
+            {language === "en"
+              ? "Field reports support LGU review. This view does not validate reports, issue warnings, declare locations safe, select evacuation routes, or replace authorized emergency command."
+              : "Ang field reports ay para sa LGU review. Hindi nagva-validate ng reports, nag-iisyu ng warnings, nagdedeklara ng safe na lugar, pumipili ng evacuation route, o pumapalit sa authorized emergency command ang view na ito."}
+          </div>
         </div>
       );
     }
@@ -185,7 +327,7 @@ export const ModulePlaceholder: React.FC = () => {
               >
                 {t("viewAdvisory")}
               </button>
-              {!isBarangayUser ? (
+              {!isBarangayUser && !isFieldResponderUser ? (
                 <button
                   type="button"
                   onClick={() => setIsAdvisoryFormOpen(true)}
@@ -1210,6 +1352,12 @@ export const ModulePlaceholder: React.FC = () => {
             </div>
           ) : null}
 
+          {isFieldResponderUser ? (
+            <div className="mt-2 inline-flex items-center rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-[11px] font-semibold text-blue-900">
+              Field Responder • Lucena City Field Operations
+            </div>
+          ) : null}
+
           <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
             {language === "en"
               ? "This reporting form does not replace emergency dispatch. Immediate life-safety emergencies should still use authorized emergency channels."
@@ -1844,6 +1992,10 @@ export const ModulePlaceholder: React.FC = () => {
   }
 
   if (currentModule === "prepare") {
+    if (isFieldResponderUser) {
+      return renderHomeScreen();
+    }
+
     switch (prepareSubView) {
       case "priority-barangays":
         return isBarangayUser
@@ -1868,7 +2020,9 @@ export const ModulePlaceholder: React.FC = () => {
   }
 
   if (currentModule === "recovery") {
-    return isBarangayUser ? renderHomeScreen() : renderPostImpactScreen();
+    return isBarangayUser || isFieldResponderUser
+      ? renderHomeScreen()
+      : renderPostImpactScreen();
   }
 
   return renderHomeScreen();

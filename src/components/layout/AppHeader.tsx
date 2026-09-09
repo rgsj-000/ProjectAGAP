@@ -6,7 +6,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { LanguageSelector } from "./LanguageSelector";
 import { UserProfileArea } from "./UserProfileArea";
 import { ProjectAgapBrand } from "@/components/branding/ProjectAgapBrand";
-import { HelpCircle, ChevronRight, Phone } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 
 export const AppHeader: React.FC = () => {
   const {
@@ -14,10 +14,10 @@ export const AppHeader: React.FC = () => {
     activeNavItem,
     prepareSubView,
     selectedBarangay,
-    setIsHelpOpen,
     goToPrepare,
     setIsAdvisoryModalOpen,
     isBarangayUser,
+    isFieldResponderUser,
   } = useNavigation();
   const { language, t } = useLanguage();
 
@@ -101,7 +101,11 @@ export const AppHeader: React.FC = () => {
             className="h-7 w-auto shrink-0"
           />
           <span className="hidden text-[11px] font-medium text-slate-400 sm:inline">
-            • {isBarangayUser ? "Gulang-Gulang" : "Lucena City"}
+            • {isBarangayUser
+              ? "Gulang-Gulang"
+              : isFieldResponderUser
+                ? "Field Operations"
+                : "Lucena City"}
           </span>
         </div>
 
@@ -133,6 +137,11 @@ export const AppHeader: React.FC = () => {
               <ChevronRight className="w-3 h-3 text-slate-300" />
               <span className="font-semibold text-blue-700">Barangay Gulang-Gulang</span>
             </>
+          ) : isFieldResponderUser ? (
+            <>
+              <ChevronRight className="w-3 h-3 text-slate-300" />
+              <span className="font-semibold text-blue-700">Field Operations</span>
+            </>
           ) : null}
           {getSubBreadcrumb()}
         </div>
@@ -150,15 +159,6 @@ export const AppHeader: React.FC = () => {
             <span>{t("activeAdvisoryBadge")}</span>
           </button>
 
-          {/* Calm Help & Emergency access */}
-          <button
-            type="button"
-            onClick={() => setIsHelpOpen(true)}
-            className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 font-medium px-2 py-1 rounded hover:bg-slate-100 transition-colors"
-          >
-            <Phone className="w-3.5 h-3.5 text-slate-400" />
-            <span>{t("help")}</span>
-          </button>
         </div>
       </div>
     </header>

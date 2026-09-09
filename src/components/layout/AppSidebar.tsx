@@ -23,6 +23,7 @@ export const AppSidebar: React.FC = () => {
     setIsHelpOpen,
     setPrepareSubView,
     isBarangayUser,
+    isFieldResponderUser,
   } = useNavigation();
   const { language, t } = useLanguage();
 
@@ -51,9 +52,13 @@ export const AppSidebar: React.FC = () => {
     }
   };
 
-  const visibleNavItems = isBarangayUser
-    ? PRIMARY_NAV_ITEMS.filter((item) => item.id !== "recovery")
-    : PRIMARY_NAV_ITEMS;
+  const visibleNavItems = isFieldResponderUser
+    ? PRIMARY_NAV_ITEMS.filter(
+        (item) => item.id === "home" || item.id === "report-damage"
+      )
+    : isBarangayUser
+      ? PRIMARY_NAV_ITEMS.filter((item) => item.id !== "recovery")
+      : PRIMARY_NAV_ITEMS;
 
   return (
     <aside
@@ -79,7 +84,9 @@ export const AppSidebar: React.FC = () => {
               <span>
                 {isBarangayUser
                   ? "Barangay Gulang-Gulang"
-                  : "Lucena City, Quezon"}
+                  : isFieldResponderUser
+                    ? "Lucena City Field Operations"
+                    : "Lucena City, Quezon"}
               </span>
             </span>
           </div>
