@@ -71,7 +71,7 @@ describe("AI route", () => {
       "GEMINI_UNAVAILABLE",
       "provider request contained api-key-secret",
       503,
-      { reason: "api-key-secret", raw: "private provider detail" },
+      { reason: "api-key-secret", stage: "schema_mismatch", raw: "private provider detail" },
     ));
 
     const { POST } = await import("./route");
@@ -89,6 +89,7 @@ describe("AI route", () => {
 
     expect(json.data.fallbackReason).toBe("unavailable");
     expect(serialized).not.toContain("api-key-secret");
+    expect(serialized).not.toContain("schema_mismatch");
     expect(serialized).not.toContain("private provider detail");
   });
 });

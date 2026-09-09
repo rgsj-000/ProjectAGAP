@@ -10,17 +10,26 @@ const output = z.object({
 
 const GEMINI_TIMEOUT_MS = 60_000;
 
-function failureReason(error: unknown) {
-  if (error instanceof Error && error.name === "AbortError") return "timeout";
-  if (error instanceof Error && error.message.startsWith("Gemini HTTP")) return "provider_error";
-  if (error instanceof SyntaxError || error instanceof z.ZodError) return "invalid_response";
+function failureMetadata(error: unknown) {
+  if (error instanceof Error && error.name === "AbortError") {
+    return { category: "timeout", stage: "request_timeout" };
+  }
+  if (error instanceof Error && error.message.startsWith("Gemini HTTP")) {
+    return { category: "provider_error", stage: "provider_http" };
+  }
+  if (error instanceof SyntaxError) {
+    return { category: "invalid_response", stage: "malformed_json" };
+  }
+  if (error instanceof z.ZodError) {
+    return { category: "invalid_response", stage: "schema_mismatch" };
+  }
   if (error instanceof Error && error.message === "Gemini returned no text candidate") {
-    return "invalid_response";
+    return { category: "invalid_response", stage: "missing_candidate" };
   }
   if (error instanceof Error && error.message === "Prohibited AI content detected.") {
-    return "invalid_response";
+    return { category: "invalid_response", stage: "safety_rejection" };
   }
-  return "unavailable";
+  return { category: "unavailable", stage: "transport_error" };
 }
 
 function parseJson(text: string) {
@@ -41,8 +50,8 @@ export async function explainWithGemini(input: {
   const model = process.env.GEMINI_MODEL?.trim() || "gemini-3.6-flash";
 
   if (!key) {
-    const details = { reason: "unavailable", elapsedMs: Date.now() - startedAt };
-    console.error("AGAP Gemini request failed", { model, category: details.reason, elapsedMs: details.elapsedMs });
+    const details = { reason: "unavailable", stage: "configuration", elapsedMs: Date.now() - startedAt };
+    console.error("AGAP Gemini request failed", { model, category: details.reason, stage: details.stage, elapsedMs: details.elapsedMs });
     throw new AppError(
       "GEMINI_UNAVAILABLE",
       "Gemini is not configured. Deterministic output remains available.",
@@ -72,16 +81,21 @@ export async function explainWithGemini(input: {
         cache: "no-store",
       },
     );
-    const body = await response.json().catch((error: unknown) => {
+    let body: any = null;
+    let bodyParseError: unknown;
+    try {
+      body = await response.json();
+    } catch (error) {
       if (error instanceof Error && error.name === "AbortError") throw error;
-      return null;
-    });
+      bodyParseError = error;
+    }
 
     if (!response.ok) {
       throw new Error(
         `Gemini HTTP ${response.status}${body?.error?.status ? ` (${body.error.status})` : ""}`,
       );
     }
+    if (bodyParseError) throw bodyParseError;
 
     const text = body?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (typeof text !== "string" || !text.trim()) {
@@ -92,14 +106,14 @@ export async function explainWithGemini(input: {
     assertSafeAiWording(parsed.text);
     return parsed;
   } catch (error) {
-    const category = failureReason(error);
+    const { category, stage } = failureMetadata(error);
     const elapsedMs = Date.now() - startedAt;
-    console.error("AGAP Gemini request failed", { model, category, elapsedMs });
+    console.error("AGAP Gemini request failed", { model, category, stage, elapsedMs });
     throw new AppError(
       "GEMINI_UNAVAILABLE",
       "Gemini response failed validation. Use the deterministic template.",
       503,
-      { reason: category, elapsedMs },
+      { reason: category, stage, elapsedMs },
     );
   } finally {
     clearTimeout(timeout);

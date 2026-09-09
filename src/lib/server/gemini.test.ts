@@ -13,6 +13,7 @@ describe("explainWithGemini", () => {
   afterEach(() => {
     vi.useRealTimers();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     if (originalApiKey === undefined) delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = originalApiKey;
     if (originalModel === undefined) delete process.env.GEMINI_MODEL;
@@ -46,7 +47,10 @@ describe("explainWithGemini", () => {
 
     expect(aborted).toBe(true);
     expect(error).toBeInstanceOf(AppError);
-    expect((error as AppError).details).toMatchObject({ reason: "timeout" });
+    expect((error as AppError).details).toMatchObject({
+      reason: "timeout",
+      stage: "request_timeout",
+    });
   });
 
   it("uses the stable default model when GEMINI_MODEL is blank", async () => {
@@ -96,6 +100,7 @@ describe("explainWithGemini", () => {
     expect(logged).not.toContain("test-key");
     expect(logged).not.toContain("private provider detail");
     expect(logged).toContain("unavailable");
+    expect(logged).toContain("transport_error");
   });
 
   it("categorizes and logs missing API-key configuration", async () => {
@@ -111,6 +116,7 @@ describe("explainWithGemini", () => {
     expect(error).toBeInstanceOf(AppError);
     expect((error as AppError).details).toMatchObject({ reason: "unavailable" });
     expect(JSON.stringify(errorLog.mock.calls)).toContain("unavailable");
+    expect(JSON.stringify(errorLog.mock.calls)).toContain("configuration");
   });
 
   it("reports timeout when Gemini headers arrive but the response body stalls", async () => {
@@ -141,11 +147,14 @@ describe("explainWithGemini", () => {
     const error = await result;
 
     expect(error).toBeInstanceOf(AppError);
-    expect((error as AppError).details).toMatchObject({ reason: "timeout" });
+    expect((error as AppError).details).toMatchObject({
+      reason: "timeout",
+      stage: "request_timeout",
+    });
   });
 
   it("classifies prohibited Gemini wording as an invalid response", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubGlobal("fetch", () => Promise.resolve(new Response(JSON.stringify({
       candidates: [{
         content: {
@@ -168,5 +177,78 @@ describe("explainWithGemini", () => {
 
     expect(error).toBeInstanceOf(AppError);
     expect((error as AppError).details).toMatchObject({ reason: "invalid_response" });
+    expect(JSON.stringify(errorLog.mock.calls)).toContain("safety_rejection");
+  });
+
+  it.each([
+    {
+      name: "missing candidate text",
+      body: { candidates: [{ content: { parts: [] } }] },
+      stage: "missing_candidate",
+    },
+    {
+      name: "malformed generated JSON",
+      body: { candidates: [{ content: { parts: [{ text: "not-json" }] } }] },
+      stage: "malformed_json",
+    },
+    {
+      name: "generated JSON with the wrong schema",
+      body: { candidates: [{ content: { parts: [{ text: JSON.stringify({ text: "Verified information only." }) }] } }] },
+      stage: "schema_mismatch",
+    },
+  ])("logs $stage for $name", async ({ body, stage }) => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", () => Promise.resolve(new Response(JSON.stringify(body), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })));
+
+    await expect(explainWithGemini({
+      task: "Explain",
+      verifiedInput: { risk: "HIGH" },
+      language: "en",
+    })).rejects.toBeInstanceOf(AppError);
+
+    expect(JSON.stringify(errorLog.mock.calls)).toContain(stage);
+  });
+
+  it("logs malformed_json when a successful provider envelope is not JSON", async () => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", () => Promise.resolve(new Response("{", {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    })));
+
+    await expect(explainWithGemini({
+      task: "Explain",
+      verifiedInput: { risk: "HIGH" },
+      language: "en",
+    })).rejects.toBeInstanceOf(AppError);
+
+    const logged = JSON.stringify(errorLog.mock.calls);
+    expect(logged).toContain("invalid_response");
+    expect(logged).toContain("malformed_json");
+    expect(logged).not.toContain("missing_candidate");
+  });
+
+  it("logs provider_http for a non-success response with a malformed envelope", async () => {
+    const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", () => Promise.resolve(new Response("{", {
+      status: 429,
+      headers: { "content-type": "application/json" },
+    })));
+
+    const error = await explainWithGemini({
+      task: "Explain",
+      verifiedInput: { risk: "HIGH" },
+      language: "en",
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(AppError);
+    expect((error as AppError).details).toMatchObject({
+      reason: "provider_error",
+      stage: "provider_http",
+    });
+    expect(JSON.stringify(errorLog.mock.calls)).toContain("provider_http");
   });
 });
