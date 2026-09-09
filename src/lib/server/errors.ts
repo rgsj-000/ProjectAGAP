@@ -25,6 +25,24 @@ export function fail(error: unknown) {
   if (error instanceof AppError || error instanceof DomainError) {
     return NextResponse.json({ success: false, error: { code: error.code, message: error.message, details: error.details } }, { status: error.status });
   }
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "23505"
+  ) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: {
+          code: "INVALID_INPUT",
+          message:
+            "A record with the same unique reference already exists. Review the existing record or use the correct reference.",
+        },
+      },
+      { status: 409 },
+    );
+  }
   console.error("Unhandled AGAP error", error);
   return NextResponse.json({ success: false, error: { code: "INTERNAL_ERROR", message: "An unexpected server error occurred." } }, { status: 500 });
 }
