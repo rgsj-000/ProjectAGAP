@@ -1,8 +1,10 @@
 "use client";
 
-import React, { FormEvent, useMemo, useState } from "react";
+import React, { FormEvent, useMemo, useRef, useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
-import { AlertCircle, Plus, ShieldCheck, Trash2 } from "lucide-react";
+import HelpTooltip from "@/components/ui/HelpTooltip";
+import { getHelpContent, type HelpContentDefinition } from "@/lib/help-content";
+import { AlertCircle, FileText, Image as ImageIcon, Plus, ShieldCheck, Trash2, UploadCloud } from "lucide-react";
 
 export interface AdvisoryFormValues {
   title: string;
@@ -22,7 +24,8 @@ export interface AdvisoryFormValues {
 interface AdvisoryFormProps {
   initialValues?: Partial<AdvisoryFormValues>;
   onCancel?: () => void;
-  onSave?: (values: AdvisoryFormValues) => void | Promise<void>;
+  onSave?: (values: AdvisoryFormValues, sourceFile: File | null) => void | Promise<void>;
+  onFileChange?: (file: File | null) => void;
 }
 
 const DEFAULT_VALUES: AdvisoryFormValues = {
@@ -40,10 +43,33 @@ const DEFAULT_VALUES: AdvisoryFormValues = {
   precautions: [""],
 };
 
+const MAX_ADVISORY_FILE_BYTES = 6 * 1024 * 1024;
+const ADVISORY_FILE_ACCEPT =
+  ".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg";
+
+const ALLOWED_ADVISORY_FILES = new Map([
+  ["pdf", "application/pdf"],
+  ["png", "image/png"],
+  ["jpg", "image/jpeg"],
+  ["jpeg", "image/jpeg"],
+]);
+
+const formatFileSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`;
+  const kilobytes = bytes / 1024;
+  if (kilobytes < 1024) return `${kilobytes.toFixed(kilobytes >= 100 ? 0 : 1)} KB`;
+  const megabytes = kilobytes / 1024;
+  return `${megabytes.toFixed(megabytes >= 10 ? 1 : 2)} MB`;
+};
+
+const getFileExtension = (name: string) =>
+  name.includes(".") ? name.split(".").pop()?.toLowerCase() ?? "" : "";
+
 export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
   initialValues,
   onCancel,
   onSave,
+  onFileChange,
 }) => {
   const { language } = useLanguage();
   const [values, setValues] = useState<AdvisoryFormValues>({
@@ -57,23 +83,27 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [localSuccess, setLocalSuccess] = useState(false);
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState("");
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const copy = useMemo(
     () =>
       language === "en"
         ? {
-            eyebrow: "OFFICIAL ADVISORY INPUT",
+            eyebrow: "Official advisory input",
             title: "Create or Update Advisory",
             description:
               "Record only verified information issued by PAGASA, DOST, Lucena CDRRMO, or another authorized source.",
-            verificationTitle: "Verification required",
+            verificationTitle: "Before saving",
             verificationBody:
-              "Project AGAP does not generate disaster advisories. Confirm the issuing agency, bulletin reference, issued time, validity, affected locations, source link, and verification state before saving.",
+              "Use only official source information. Check the source, reference, time, validity, affected locations, and verification status.",
             titleLabel: "Advisory title",
             titlePlaceholder: "e.g. Severe Rainfall Advisory",
             sourceLabel: "Issuing source",
             sourcePlaceholder: "e.g. PAGASA • DOST",
-            statusLabel: "Status",
+            statusLabel: "Advisory status",
             issuedLabel: "Issued / updated time",
             issuedPlaceholder: "e.g. Updated 11:00 AM Today",
             bulletinLabel: "Bulletin / reference number",
@@ -88,9 +118,9 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
               "Enter the warning level, classification, rainfall range, wind signal, or other source-issued warning information.",
             sourceUrlLabel: "Official source link",
             sourceUrlPlaceholder: "https://...",
-            verificationStateLabel: "Verification state",
+            verificationStateLabel: "Verification status",
             verificationStateHelp:
-              "This field records review state only. Backend authorization must determine who may mark an advisory VERIFIED.",
+              "Verification status is confirmed through the authorized LGU review process.",
             messageLabel: "Main advisory message",
             messagePlaceholder: "Enter the verified advisory summary...",
             precautionsLabel: "Key directives / precautions",
@@ -100,24 +130,35 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             save: "Save advisory",
             saving: "Saving...",
             localSuccess:
-              "Advisory saved in the frontend only. Backend validation and publishing are not connected yet.",
+              "Advisory information is ready for authorized review. It is not treated as verified until the required review is completed.",
             required: "This field is required.",
             invalidUrl: "Enter a valid http:// or https:// source link.",
             precautionRequired: "Add at least one directive or precaution.",
+            fileLabel: "Official advisory file",
+            fileDescription:
+              "Attach the official bulletin or advisory used as the source record.",
+            fileFormats: "PDF, PNG, JPG, or JPEG • Maximum 6 MB • One file",
+            chooseFile: "Choose file",
+            dropFile: "Drop the file here",
+            replaceFile: "Replace file",
+            removeFile: "Remove file",
+            fileReady: "Ready to upload when the advisory is saved",
+            fileTooLarge: "File is larger than the 6 MB limit.",
+            fileTypeInvalid: "Use a PDF, PNG, JPG, or JPEG file.",
           }
         : {
-            eyebrow: "PAGLALAGAY NG OPISYAL NA BABALA",
+            eyebrow: "Official advisory input",
             title: "Gumawa o Mag-update ng Babala",
             description:
               "Itala lamang ang beripikadong impormasyong inilabas ng PAGASA, DOST, Lucena CDRRMO, o ibang awtorisadong ahensya.",
-            verificationTitle: "Kailangang beripikado",
+            verificationTitle: "Bago i-save",
             verificationBody:
-              "Hindi gumagawa ng sariling disaster advisory ang Project AGAP. Tiyakin ang ahensyang naglabas, bulletin reference, oras ng paglabas, validity, mga apektadong lugar, source link, at verification state bago i-save.",
+              "Gamitin lamang ang official source information. Suriin ang source, reference, oras, validity, affected locations, at verification status.",
             titleLabel: "Pamagat ng babala",
             titlePlaceholder: "hal. Babala sa Malakas na Ulan",
             sourceLabel: "Ahensyang naglabas",
             sourcePlaceholder: "hal. PAGASA • DOST",
-            statusLabel: "Katayuan",
+            statusLabel: "Advisory status",
             issuedLabel: "Oras ng paglabas / update",
             issuedPlaceholder: "hal. Na-update 11:00 AM Ngayon",
             bulletinLabel: "Bulletin / reference number",
@@ -132,9 +173,9 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
               "Ilagay ang warning level, classification, rainfall range, wind signal, o iba pang impormasyong inilabas ng source.",
             sourceUrlLabel: "Opisyal na source link",
             sourceUrlPlaceholder: "https://...",
-            verificationStateLabel: "Verification state",
+            verificationStateLabel: "Verification status",
             verificationStateHelp:
-              "Itinatala lamang ng field na ito ang review state. Dapat tukuyin ng backend authorization kung sino ang maaaring magmarka bilang VERIFIED.",
+              "Ang verification status ay kinukumpirma sa authorized LGU review process.",
             messageLabel: "Pangunahing mensahe",
             messagePlaceholder: "Ilagay ang beripikadong buod ng babala...",
             precautionsLabel: "Mga pangunahing tagubilin / pag-iingat",
@@ -144,10 +185,21 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             save: "I-save ang babala",
             saving: "Sine-save...",
             localSuccess:
-              "Na-save lamang ang advisory sa frontend. Hindi pa nakakonekta ang backend validation at publishing.",
+              "Handa na ang advisory information para sa authorized review. Hindi ito itinuturing na verified hangga't hindi tapos ang required review.",
             required: "Kinakailangan ang field na ito.",
             invalidUrl: "Maglagay ng valid na http:// o https:// source link.",
             precautionRequired: "Magdagdag ng kahit isang tagubilin o pag-iingat.",
+            fileLabel: "Official advisory file",
+            fileDescription:
+              "I-attach ang official bulletin o advisory na ginamit bilang source record.",
+            fileFormats: "PDF, PNG, JPG, o JPEG • Maximum 6 MB • Isang file",
+            chooseFile: "Pumili ng file",
+            dropFile: "I-drop ang file dito",
+            replaceFile: "Palitan ang file",
+            removeFile: "Alisin ang file",
+            fileReady: "Handa nang i-upload kapag sine-save ang advisory",
+            fileTooLarge: "Lumampas ang file sa 6 MB limit.",
+            fileTypeInvalid: "Gumamit ng PDF, PNG, JPG, o JPEG file.",
           },
     [language]
   );
@@ -159,6 +211,66 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
     setValues((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: "" }));
     setLocalSuccess(false);
+  };
+
+  const clearSourceFile = () => {
+    setSourceFile(null);
+    setFileError("");
+    setLocalSuccess(false);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    onFileChange?.(null);
+  };
+
+  const selectSourceFile = (file: File | null) => {
+    if (!file) return;
+
+    const extension = getFileExtension(file.name);
+    const expectedMime = ALLOWED_ADVISORY_FILES.get(extension);
+    const mimeMatches =
+      Boolean(expectedMime) && (file.type === expectedMime || file.type === "");
+
+    if (!expectedMime || !mimeMatches) {
+      setSourceFile(null);
+      setFileError(copy.fileTypeInvalid);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      onFileChange?.(null);
+      return;
+    }
+
+    if (file.size > MAX_ADVISORY_FILE_BYTES) {
+      setSourceFile(null);
+      setFileError(copy.fileTooLarge);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      onFileChange?.(null);
+      return;
+    }
+
+    setSourceFile(file);
+    setFileError("");
+    setLocalSuccess(false);
+    onFileChange?.(file);
+  };
+
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    selectSourceFile(event.target.files?.[0] ?? null);
+  };
+
+  const handleFileDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDraggingFile(false);
+    selectSourceFile(event.dataTransfer.files?.[0] ?? null);
+  };
+
+  const handleFileDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (!isDraggingFile) setIsDraggingFile(true);
+  };
+
+  const handleFileDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+    setIsDraggingFile(false);
   };
 
   const updatePrecaution = (index: number, value: string) => {
@@ -235,7 +347,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
     setIsSaving(true);
     try {
       if (onSave) {
-        await onSave(sanitized);
+        await onSave(sanitized, sourceFile);
       } else {
         setLocalSuccess(true);
       }
@@ -269,6 +381,119 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+        <div className="mb-5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-bold text-slate-800">{copy.fileLabel}</span>
+            <HelpTooltip
+              content={{
+                title: copy.fileLabel,
+                description: copy.fileDescription,
+              }}
+              align="left"
+            />
+          </div>
+          <p className="mt-1 text-[11px] leading-5 text-slate-500">{copy.fileFormats}</p>
+        </div>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ADVISORY_FILE_ACCEPT}
+          onChange={handleFileInputChange}
+          className="sr-only"
+          aria-label={copy.fileLabel}
+        />
+
+        {!sourceFile ? (
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => fileInputRef.current?.click()}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                fileInputRef.current?.click();
+              }
+            }}
+            onDrop={handleFileDrop}
+            onDragOver={handleFileDragOver}
+            onDragEnter={(event) => {
+              event.preventDefault();
+              setIsDraggingFile(true);
+            }}
+            onDragLeave={handleFileDragLeave}
+            className={`flex min-h-40 cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed px-5 py-6 text-center outline-none transition-colors focus:ring-2 focus:ring-blue-600/20 ${
+              isDraggingFile
+                ? "border-blue-400 bg-blue-50/70"
+                : fileError
+                  ? "border-red-300 bg-red-50/40"
+                  : "border-slate-300 bg-slate-50/60 hover:border-blue-300 hover:bg-blue-50/40"
+            }`}
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-white text-blue-700 shadow-sm">
+              <UploadCloud className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <p className="mt-3 text-sm font-semibold text-slate-800">
+              {isDraggingFile ? copy.dropFile : copy.chooseFile}
+            </p>
+            <p className="mt-1 text-[11px] leading-5 text-slate-500">
+              {copy.fileDescription}
+            </p>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/45 p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-emerald-200 bg-white text-emerald-700">
+                  {sourceFile.type.startsWith("image/") ? (
+                    <ImageIcon className="h-5 w-5" aria-hidden="true" />
+                  ) : (
+                    <FileText className="h-5 w-5" aria-hidden="true" />
+                  )}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-900">
+                    {sourceFile.name}
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-slate-500">
+                    {formatFileSize(sourceFile.size)} • {copy.fileReady}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex shrink-0 gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="min-h-9 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  {copy.replaceFile}
+                </button>
+                <button
+                  type="button"
+                  onClick={clearSourceFile}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-50"
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  {copy.removeFile}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {fileError ? (
+          <p
+            role="alert"
+            className="mt-2 flex items-center gap-1.5 text-[11px] font-medium text-red-700"
+          >
+            <AlertCircle className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+            {fileError}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <Field label={copy.titleLabel} error={errors.title} className="sm:col-span-2">
             <input
@@ -280,7 +505,11 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             />
           </Field>
 
-          <Field label={copy.sourceLabel} error={errors.source}>
+          <Field
+            label={copy.sourceLabel}
+            error={errors.source}
+            helpContent={getHelpContent("advisoryIssuingSource", language)}
+          >
             <input
               value={values.source}
               onChange={(event) => updateField("source", event.target.value)}
@@ -290,7 +519,11 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             />
           </Field>
 
-          <Field label={copy.statusLabel}>
+          <Field
+            label={copy.statusLabel}
+            helpContent={getHelpContent("advisoryStatus", language)}
+            helpAlign="right"
+          >
             <select
               value={values.status}
               onChange={(event) =>
@@ -304,7 +537,11 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             </select>
           </Field>
 
-          <Field label={copy.issuedLabel} error={errors.issuedTime}>
+          <Field
+            label={copy.issuedLabel}
+            error={errors.issuedTime}
+            helpContent={getHelpContent("advisoryIssuedTime", language)}
+          >
             <input
               value={values.issuedTime}
               onChange={(event) => updateField("issuedTime", event.target.value)}
@@ -314,7 +551,12 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             />
           </Field>
 
-          <Field label={copy.bulletinLabel} error={errors.bulletinNumber}>
+          <Field
+            label={copy.bulletinLabel}
+            error={errors.bulletinNumber}
+            helpContent={getHelpContent("advisoryBulletinReference", language)}
+            helpAlign="right"
+          >
             <input
               value={values.bulletinNumber}
               onChange={(event) => updateField("bulletinNumber", event.target.value)}
@@ -324,7 +566,11 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             />
           </Field>
 
-          <Field label={copy.validityLabel} error={errors.validity}>
+          <Field
+            label={copy.validityLabel}
+            error={errors.validity}
+            helpContent={getHelpContent("advisoryValidUntil", language)}
+          >
             <input
               value={values.validity}
               onChange={(event) => updateField("validity", event.target.value)}
@@ -334,7 +580,11 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             />
           </Field>
 
-          <Field label={copy.verificationStateLabel}>
+          <Field
+            label={copy.verificationStateLabel}
+            helpContent={getHelpContent("advisoryVerificationStatus", language)}
+            helpAlign="right"
+          >
             <select
               value={values.verificationState}
               onChange={(event) =>
@@ -345,19 +595,17 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
               }
               className={inputClass(false)}
             >
-              <option value="UNVERIFIED">UNVERIFIED</option>
-              <option value="FOR_REVIEW">FOR REVIEW</option>
-              <option value="VERIFIED">VERIFIED</option>
+              <option value="UNVERIFIED">Unverified</option>
+              <option value="FOR_REVIEW">For Review</option>
+              <option value="VERIFIED">Verified</option>
             </select>
-            <span className="mt-1.5 block text-[11px] leading-relaxed text-slate-500">
-              {copy.verificationStateHelp}
-            </span>
           </Field>
 
           <Field
             label={copy.affectedLocationsLabel}
             error={errors.affectedLocations}
             className="sm:col-span-2"
+            helpContent={getHelpContent("advisoryAffectedLocations", language)}
           >
             <textarea
               value={values.affectedLocations}
@@ -372,6 +620,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             label={copy.warningInformationLabel}
             error={errors.warningInformation}
             className="sm:col-span-2"
+            helpContent={getHelpContent("advisoryWarningInformation", language)}
           >
             <textarea
               value={values.warningInformation}
@@ -386,6 +635,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             label={copy.sourceUrlLabel}
             error={errors.sourceUrl}
             className="sm:col-span-2"
+            helpContent={getHelpContent("advisorySourceLink", language)}
           >
             <input
               type="url"
@@ -398,7 +648,12 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             />
           </Field>
 
-          <Field label={copy.messageLabel} error={errors.message} className="sm:col-span-2">
+          <Field
+            label={copy.messageLabel}
+            error={errors.message}
+            className="sm:col-span-2"
+            helpContent={getHelpContent("advisoryMainMessage", language)}
+          >
             <textarea
               value={values.message}
               onChange={(event) => updateField("message", event.target.value)}
@@ -412,6 +667,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             label={copy.precautionsLabel}
             error={errors.precautions}
             className="sm:col-span-2"
+            helpContent={getHelpContent("advisoryDirectives", language)}
           >
             <div className="space-y-2.5">
               {values.precautions.map((precaution, index) => (
@@ -486,12 +742,26 @@ interface FieldProps {
   label: string;
   error?: string;
   className?: string;
+  helpContent?: HelpContentDefinition;
+  helpAlign?: "left" | "center" | "right";
   children: React.ReactNode;
 }
 
-const Field: React.FC<FieldProps> = ({ label, error, className = "", children }) => (
+const Field: React.FC<FieldProps> = ({
+  label,
+  error,
+  className = "",
+  helpContent,
+  helpAlign = "left",
+  children,
+}) => (
   <label className={`block ${className}`}>
-    <span className="mb-1.5 block text-xs font-bold text-slate-800">{label}</span>
+    <span className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+      <span>{label}</span>
+      {helpContent ? (
+        <HelpTooltip content={helpContent} align={helpAlign} />
+      ) : null}
+    </span>
     {children}
     {error && (
       <span className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-red-700">

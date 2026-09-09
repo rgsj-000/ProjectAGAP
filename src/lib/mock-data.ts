@@ -52,9 +52,9 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
     shortLabelEn: "Damage & Needs",
     shortLabelFil: "Pinsala at Kailangan",
     descriptionEn:
-      "Record reported damage, urgent needs, verification state, and field information for authorized review.",
+      "Record reported damage, affected population, priority needs, verification status, and field information for authorized LGU review.",
     descriptionFil:
-      "Itala ang reported na pinsala, agarang pangangailangan, verification state, at field information para sa awtorisadong review.",
+      "Itala ang reported damage, affected population, priority needs, verification status, at field information para sa authorized LGU review.",
     iconName: "FileEdit",
   },
   {
@@ -64,9 +64,9 @@ export const PRIMARY_NAV_ITEMS: NavItemConfig[] = [
     shortLabelEn: "Post Impact",
     shortLabelFil: "Post Impact",
     descriptionEn:
-      "Review reported versus validated impacts, urgent unmet needs, and source-anchored LGU actions.",
+      "Review reported versus validated impacts, information pending validation, priority needs, and source-based LGU actions.",
     descriptionFil:
-      "Suriin ang reported at validated impacts, agarang hindi natutugunang pangangailangan, at source-anchored LGU actions.",
+      "Suriin ang reported at validated impacts, information pending validation, priority needs, at source-based LGU actions.",
     iconName: "TrendingUp",
   },
 ];
@@ -94,8 +94,8 @@ export const LUCENA_EMERGENCY_CONTACTS: EmergencyContact[] = [
     agencyEn: "Lucena City CDRRMO",
     agencyFil: "Lucena City CDRRMO",
     contactNumber: "—",
-    descriptionEn: "City disaster-response contact entry awaiting official verification.",
-    descriptionFil: "City disaster-response contact entry na naghihintay ng opisyal na verification.",
+    descriptionEn: "City disaster-response contact. Official contact number still needs verification.",
+    descriptionFil: "City disaster-response contact. Kailangan pang i-verify ang official contact number.",
     verificationState: "UNVERIFIED",
     verificationNoteEn: "Verify through an authorized Lucena City directory before operational use.",
     verificationNoteFil: "I-verify sa awtorisadong Lucena City directory bago gamitin sa operasyon.",
@@ -105,8 +105,8 @@ export const LUCENA_EMERGENCY_CONTACTS: EmergencyContact[] = [
     agencyEn: "National Emergency Hotline",
     agencyFil: "Pambansang Emergency Hotline",
     contactNumber: "—",
-    descriptionEn: "Emergency-hotline entry awaiting authoritative verification.",
-    descriptionFil: "Emergency-hotline entry na naghihintay ng authoritative verification.",
+    descriptionEn: "Emergency hotline. The current official number still needs verification.",
+    descriptionFil: "Emergency hotline. Kailangan pang i-verify ang kasalukuyang official number.",
     verificationState: "UNVERIFIED",
     verificationNoteEn: "Confirm the current official hotline before displaying or dialing.",
     verificationNoteFil: "Kumpirmahin ang kasalukuyang opisyal na hotline bago ipakita o tawagan.",
@@ -116,8 +116,8 @@ export const LUCENA_EMERGENCY_CONTACTS: EmergencyContact[] = [
     agencyEn: "Philippine Red Cross — Lucena / Quezon",
     agencyFil: "Philippine Red Cross — Lucena / Quezon",
     contactNumber: "—",
-    descriptionEn: "Humanitarian-response contact entry awaiting official verification.",
-    descriptionFil: "Humanitarian-response contact entry na naghihintay ng opisyal na verification.",
+    descriptionEn: "Humanitarian-response contact. Official contact number still needs verification.",
+    descriptionFil: "Humanitarian-response contact. Kailangan pang i-verify ang official contact number.",
     verificationState: "UNVERIFIED",
     verificationNoteEn: "Verify the current chapter contact through an authorized source.",
     verificationNoteFil: "I-verify ang kasalukuyang chapter contact sa awtorisadong source.",
@@ -126,8 +126,8 @@ export const LUCENA_EMERGENCY_CONTACTS: EmergencyContact[] = [
     agencyEn: "Lucena City Police",
     agencyFil: "Pulisya ng Lungsod ng Lucena",
     contactNumber: "—",
-    descriptionEn: "Police contact entry awaiting official verification.",
-    descriptionFil: "Police contact entry na naghihintay ng opisyal na verification.",
+    descriptionEn: "Police contact. Official contact number still needs verification.",
+    descriptionFil: "Police contact. Kailangan pang i-verify ang official contact number.",
     verificationState: "UNVERIFIED",
     verificationNoteEn: "Verify through an authorized PNP/LGU directory before operational use.",
     verificationNoteFil: "I-verify sa awtorisadong PNP/LGU directory bago gamitin sa operasyon.",
@@ -136,8 +136,8 @@ export const LUCENA_EMERGENCY_CONTACTS: EmergencyContact[] = [
     agencyEn: "Bureau of Fire Protection — Lucena",
     agencyFil: "Bureau of Fire Protection — Lucena",
     contactNumber: "—",
-    descriptionEn: "Fire and rescue contact entry awaiting official verification.",
-    descriptionFil: "Fire at rescue contact entry na naghihintay ng opisyal na verification.",
+    descriptionEn: "Fire and rescue contact. Official contact number still needs verification.",
+    descriptionFil: "Fire at rescue contact. Kailangan pang i-verify ang official contact number.",
     verificationState: "UNVERIFIED",
     verificationNoteEn: "Verify through an authorized BFP directory before operational use.",
     verificationNoteFil: "I-verify sa awtorisadong BFP directory bago gamitin sa operasyon.",
@@ -146,8 +146,8 @@ export const LUCENA_EMERGENCY_CONTACTS: EmergencyContact[] = [
     agencyEn: "Quezon Medical Center",
     agencyFil: "Quezon Medical Center",
     contactNumber: "—",
-    descriptionEn: "Medical-facility contact entry awaiting official verification.",
-    descriptionFil: "Medical-facility contact entry na naghihintay ng opisyal na verification.",
+    descriptionEn: "Medical-facility contact. Official contact number still needs verification.",
+    descriptionFil: "Medical-facility contact. Kailangan pang i-verify ang official contact number.",
     verificationState: "UNVERIFIED",
     verificationNoteEn: "Verify the current facility contact through an authorized directory.",
     verificationNoteFil: "I-verify ang kasalukuyang facility contact sa awtorisadong directory.",
@@ -177,9 +177,9 @@ export interface RiskAssessmentSnapshot {
  * Compatibility profile used by the current frontend navigation flow.
  *
  * IMPORTANT:
- * - This no longer stores an arbitrary 0–100 priority score.
+ * - This no longer stores an arbitrary 0–100 ranking value.
  * - It does not assign a risk category in the frontend.
- * - Deterministic risk fields remain empty until supplied by the backend.
+ * - Deterministic risk fields remain empty until supplied by the application data layer.
  * - Profile/context fields are nullable until verified source data is connected.
  *
  * The name is kept temporarily to avoid breaking NavigationContext while the
@@ -214,7 +214,7 @@ const EMPTY_RISK_ASSESSMENT: RiskAssessmentSnapshot = {
 /**
  * Temporary compatibility exports. These arrays provide barangay identities to
  * the existing UI only; their ordering is NOT an official risk or priority rank.
- * Verified profile and assessment values will come from the backend/Supabase.
+ * Verified profile and assessment values will come from the connected application data source.
  */
 export const TOP_BARANGAYS: BarangayPriority[] = [
   {
@@ -308,21 +308,21 @@ export const OTHER_BARANGAYS: BarangayPriority[] = [
 
 /**
  * @deprecated Compatibility export only.
- * The updated Project AGAP frontend does not use ranked recovery priorities,
+ * The updated Project AGAP frontend does not use ranked post-impact recovery lists,
  * arbitrary recovery levels, or invented relief quantities. Post-impact
- * decisions must use reported/validated evidence and source-anchored actions.
+ * decisions must use reported/validated evidence and approved source-based actions.
  */
 export const RECOVERY_PRIORITIES: Array<Record<string, never>> = [];
 
 /**
- * Compatibility placeholder used by the current UI until the advisory backend
+ * Compatibility placeholder used by the current UI until the advisory data source
  * is connected. Despite the legacy export name, this is NOT an official,
  * current, verified, or operational disaster advisory.
  */
 export const CURRENT_OFFICIAL_ADVISORY = {
-  titleEn: "No Verified Advisory Connected",
-  titleFil: "Walang Nakakonektang Beripikadong Advisory",
-  source: "Awaiting authorized advisory source",
+  titleEn: "No Verified Advisory Available",
+  titleFil: "Walang Available na Beripikadong Advisory",
+  source: "Official advisory source not yet available",
   issuedTime: "—",
   status: "UNVERIFIED",
   statusFil: "HINDI BERIPIKADO",
@@ -333,9 +333,9 @@ export const CURRENT_OFFICIAL_ADVISORY = {
   sourceUrl: "",
   verificationState: "UNVERIFIED" as const,
   leadParagraphEn:
-    "No verified operational advisory is currently connected to this frontend prototype. Refer to the authorized issuing agency and backend-verified record before operational use.",
+    "No verified advisory is currently available in AGAP. Check the latest information from the authorized issuing agency before making operational decisions.",
   leadParagraphFil:
-    "Walang beripikadong operational advisory na nakakonekta sa frontend prototype na ito. Sumangguni sa awtorisadong issuing agency at backend-verified record bago gamitin sa operasyon.",
+    "Walang verified advisory na kasalukuyang available sa AGAP. Tingnan ang pinakabagong impormasyon mula sa authorized issuing agency bago gumawa ng operational decisions.",
   precautionsEn: [],
   precautionsFil: [],
 };

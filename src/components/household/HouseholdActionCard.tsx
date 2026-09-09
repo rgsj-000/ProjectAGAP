@@ -6,7 +6,6 @@ import {
   Baby,
   CheckCircle2,
   Home,
-  Info,
   PawPrint,
   Pill,
   Printer,
@@ -16,6 +15,8 @@ import {
   Users,
 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
+import HelpTooltip from "@/components/ui/HelpTooltip";
+import { getHelpContent } from "@/lib/help-content";
 
 export type HouseholdMode = "code" | "quick-profile" | "generic";
 
@@ -120,8 +121,8 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
     if (!onGenerateByCode) {
       setFormError(
         language === "en"
-          ? "Household-code lookup is not connected to the backend yet."
-          : "Hindi pa nakakonekta sa backend ang household-code lookup."
+          ? "Household Code lookup is not available yet. Please try another option or try again later."
+          : "Hindi pa available ang Household Code lookup. Gumamit muna ng ibang option o subukan muli mamaya."
       );
       return;
     }
@@ -156,8 +157,8 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
     if (!onGenerateQuickProfile) {
       setFormError(
         language === "en"
-          ? "Quick-profile generation is not connected to the backend yet."
-          : "Hindi pa nakakonekta sa backend ang quick-profile generation."
+          ? "Quick Household Profile is not available yet. Please try another option or try again later."
+          : "Hindi pa available ang Quick Household Profile. Gumamit muna ng ibang option o subukan muli mamaya."
       );
       return;
     }
@@ -191,8 +192,8 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
     if (!onGenerateGeneric) {
       setFormError(
         language === "en"
-          ? "Generic barangay card generation is not connected to the backend yet."
-          : "Hindi pa nakakonekta sa backend ang generic barangay card generation."
+          ? "The general barangay preparedness card is not available yet. Please try again later."
+          : "Hindi pa available ang general barangay preparedness card. Subukan muli mamaya."
       );
       return;
     }
@@ -285,8 +286,8 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
       title: language === "en" ? "Household Code" : "Household Code",
       description:
         language === "en"
-          ? "Use a pseudonymous household code when one has been issued."
-          : "Gumamit ng pseudonymous household code kung mayroon nang naibigay.",
+          ? "Use this option if your barangay gave your household a code."
+          : "Gamitin ito kung binigyan ng barangay ng code ang inyong household.",
       icon: <UserRound className="h-4 w-4" aria-hidden="true" />,
     },
     {
@@ -294,17 +295,20 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
       title: language === "en" ? "Quick Household Profile" : "Quick Household Profile",
       description:
         language === "en"
-          ? "Answer a short preparedness profile without providing a name or exact address."
-          : "Sagutan ang maikling preparedness profile nang walang pangalan o eksaktong address.",
+          ? "Answer a few questions so AGAP can prepare guidance that fits your household."
+          : "Sagutin ang ilang tanong upang makapaghanda ang AGAP ng gabay na akma sa inyong household.",
       icon: <Users className="h-4 w-4" aria-hidden="true" />,
     },
     {
       id: "generic",
-      title: language === "en" ? "Generic Barangay Card" : "Generic Barangay Card",
+      title:
+        language === "en"
+          ? "General Barangay Preparedness Card"
+          : "Pangkalahatang Barangay Preparedness Card",
       description:
         language === "en"
-          ? "Receive general barangay guidance without household characteristics."
-          : "Tumanggap ng pangkalahatang gabay ng barangay nang walang household characteristics.",
+          ? "Get general preparedness guidance without answering household questions."
+          : "Kumuha ng pangkalahatang preparedness guidance nang hindi sumasagot ng household questions.",
       icon: <Home className="h-4 w-4" aria-hidden="true" />,
     },
   ];
@@ -313,15 +317,15 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
     <div className={`space-y-6 ${className}`}>
       <header>
         <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-blue-700">
-          {language === "en" ? "Public Preparedness Output" : "Pampublikong Gabay sa Paghahanda"}
+          {language === "en" ? "Household Preparedness Guide" : "Gabay sa Paghahanda ng Household"}
         </span>
         <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-900 sm:text-3xl">
           {language === "en" ? "Household Action Card" : "Household Action Card"}
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-slate-500">
           {language === "en"
-            ? "Choose how you want AGAP to prepare household guidance. Names and exact home addresses are not required for the MVP."
-            : "Piliin kung paano ihahanda ng AGAP ang household guidance. Hindi kailangan ang pangalan o eksaktong address ng tahanan para sa MVP."}
+            ? "Choose how you want AGAP to prepare guidance for your household. You do not need to enter your name or exact home address."
+            : "Piliin kung paano ihahanda ng AGAP ang gabay para sa inyong household. Hindi kailangang ilagay ang pangalan o eksaktong address ng tahanan."}
         </p>
       </header>
 
@@ -365,13 +369,19 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
           {mode === "code" && (
             <form onSubmit={submitCode} className="space-y-5">
               <div>
-                <h2 className="text-base font-bold text-slate-900">
-                  {language === "en" ? "Enter Household Code" : "Ilagay ang Household Code"}
-                </h2>
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-base font-bold text-slate-900">
+                    {language === "en" ? "Enter Household Code" : "Ilagay ang Household Code"}
+                  </h2>
+                  <HelpTooltip
+                    content={getHelpContent("householdCode", language)}
+                    align="left"
+                  />
+                </div>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">
                   {language === "en"
-                    ? "Use the pseudonymous code issued by the barangay. The code should link only to the minimum preparedness profile required by AGAP."
-                    : "Gamitin ang pseudonymous code na ibinigay ng barangay. Dapat naka-link lamang ito sa minimum preparedness profile na kailangan ng AGAP."}
+                    ? "Enter the code issued by your barangay. It lets AGAP use basic household preparedness information without asking for your name or exact address."
+                    : "Ilagay ang code na ibinigay ng barangay. Ginagamit ito ng AGAP para sa basic household preparedness information nang hindi hinihingi ang pangalan o eksaktong address."}
                 </p>
               </div>
 
@@ -411,13 +421,19 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
           {mode === "quick-profile" && (
             <form onSubmit={submitQuickProfile} className="space-y-5">
               <div>
-                <h2 className="text-base font-bold text-slate-900">
-                  {language === "en" ? "Quick Household Profile" : "Quick Household Profile"}
-                </h2>
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-base font-bold text-slate-900">
+                    {language === "en" ? "Quick Household Profile" : "Quick Household Profile"}
+                  </h2>
+                  <HelpTooltip
+                    content={getHelpContent("quickHouseholdProfile", language)}
+                    align="left"
+                  />
+                </div>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">
                   {language === "en"
-                    ? "Provide only the preparedness characteristics needed to match approved household actions."
-                    : "Ibigay lamang ang preparedness characteristics na kailangan para ma-match ang approved household actions."}
+                    ? "Answer only the questions needed to prepare relevant household guidance. Your name and exact address are not required."
+                    : "Sagutin lamang ang mga tanong na kailangan para sa relevant household guidance. Hindi kailangan ang pangalan o eksaktong address."}
                 </p>
               </div>
 
@@ -461,8 +477,8 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
               <fieldset>
                 <legend className="text-xs font-bold text-slate-700">
                   {language === "en"
-                    ? "Household Preparedness Characteristics"
-                    : "Household Preparedness Characteristics"}
+                    ? "Household Members and Special Needs"
+                    : "Household Members at Special Needs"}
                 </legend>
 
                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -523,7 +539,7 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
 
               <label className="block">
                 <span className="text-xs font-bold text-slate-700">
-                  {language === "en" ? "Housing Characteristics" : "Katangian ng Tahanan"}
+                  {language === "en" ? "Home / Housing Information" : "Impormasyon tungkol sa Tahanan"}
                 </span>
                 <textarea
                   value={housingCharacteristics}
@@ -531,8 +547,8 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
                   rows={3}
                   placeholder={
                     language === "en"
-                      ? "Optional brief description relevant to preparedness"
-                      : "Opsyonal na maikling paglalarawan na may kaugnayan sa paghahanda"
+                      ? "Optional: add any home condition that may affect disaster preparedness."
+                      : "Opsyonal: ilagay ang kondisyon ng tahanan na maaaring makaapekto sa disaster preparedness."
                   }
                   className="mt-2 w-full rounded-xl border border-slate-200 px-3.5 py-3 text-sm outline-none transition focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
                 />
@@ -540,7 +556,7 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
 
               <fieldset>
                 <legend className="text-xs font-bold text-slate-700">
-                  {language === "en" ? "Communication Methods" : "Paraan ng Komunikasyon"}
+                  {language === "en" ? "Ways You Can Receive Updates" : "Paraan ng Pagtanggap ng Updates"}
                 </legend>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {COMMUNICATION_OPTIONS.map((item) => {
@@ -587,13 +603,21 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
           {mode === "generic" && (
             <form onSubmit={submitGeneric} className="space-y-5">
               <div>
-                <h2 className="text-base font-bold text-slate-900">
-                  {language === "en" ? "Generic Barangay Card" : "Generic Barangay Card"}
-                </h2>
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-base font-bold text-slate-900">
+                    {language === "en"
+                      ? "General Barangay Preparedness Card"
+                      : "Pangkalahatang Barangay Preparedness Card"}
+                  </h2>
+                  <HelpTooltip
+                    content={getHelpContent("genericBarangayCard", language)}
+                    align="left"
+                  />
+                </div>
                 <p className="mt-1 text-xs leading-relaxed text-slate-500">
                   {language === "en"
-                    ? "Choose a barangay to receive general guidance based only on the verified advisory and approved general actions."
-                    : "Pumili ng barangay upang makatanggap ng pangkalahatang gabay batay lamang sa verified advisory at approved general actions."}
+                    ? "Choose your barangay to receive general preparedness guidance. This option does not ask for household details."
+                    : "Piliin ang inyong barangay upang makatanggap ng pangkalahatang preparedness guidance. Hindi humihingi ang option na ito ng household details."}
                 </p>
               </div>
 
@@ -628,8 +652,8 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
                       ? "Preparing..."
                       : "Inihahanda..."
                     : language === "en"
-                      ? "Prepare Generic Card"
-                      : "Ihanda ang Generic Card"}
+                      ? "Prepare Barangay Card"
+                      : "Ihanda ang Barangay Card"}
                 </span>
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </button>
@@ -645,12 +669,15 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
             </div>
           )}
 
-          <div className="mt-5 flex gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-3.5">
-            <Info className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" aria-hidden="true" />
+          <div className="mt-5 flex items-start gap-2 rounded-xl border border-blue-100 bg-blue-50/60 p-3.5">
+            <HelpTooltip
+              content={getHelpContent("householdPrivacy", language)}
+              align="left"
+            />
             <p className="text-xs leading-relaxed text-blue-900">
               {language === "en"
-                ? "Privacy: the MVP does not require a resident name or exact address. If authoritative household-level spatial data are unavailable, the card must not claim that a specific home will be affected."
-                : "Privacy: hindi kailangan ng MVP ang pangalan ng residente o eksaktong address. Kung walang authoritative household-level spatial data, hindi dapat sabihin ng card na tiyak na maaapektuhan ang isang partikular na tahanan."}
+                ? "Privacy: your full name and exact home address are not required."
+                : "Privacy: hindi kailangan ang buong pangalan at eksaktong address ng tahanan."}
             </p>
           </div>
         </section>
@@ -664,7 +691,7 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
             <div className="flex items-center gap-2">
               <ShieldCheck className="h-4 w-4 text-blue-600" aria-hidden="true" />
               <h2 className="text-base font-bold text-slate-900">
-                {language === "en" ? "Preparedness Card Preview" : "Preview ng Preparedness Card"}
+                {language === "en" ? "Your Household Preparedness Card" : "Inyong Household Preparedness Card"}
               </h2>
             </div>
 
@@ -686,12 +713,12 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
                   <Radio className="h-5 w-5" aria-hidden="true" />
                 </div>
                 <h3 className="mt-3 text-sm font-bold text-slate-800">
-                  {language === "en" ? "No household card generated yet" : "Wala pang nagagawang household card"}
+                  {language === "en" ? "Your preparedness card will appear here" : "Dito lalabas ang inyong preparedness card"}
                 </h3>
                 <p className="mt-1.5 text-xs leading-relaxed text-slate-500">
                   {language === "en"
-                    ? "Verified advisory content and approved action rules will appear here after the generation handler is connected."
-                    : "Lalabas dito ang verified advisory content at approved action rules kapag nakakonekta na ang generation handler."}
+                    ? "Complete one of the options on the left to prepare your household guidance."
+                    : "Kumpletuhin ang isa sa mga option sa kaliwa upang maihanda ang inyong household guidance."}
                 </p>
               </div>
             </div>
@@ -720,9 +747,18 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-xl border border-slate-200 p-3.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {language === "en" ? "Verified Advisory" : "Verified Advisory"}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      {language === "en"
+                        ? "Official Advisory Information"
+                        : "Impormasyon ng Opisyal na Advisory"}
+                    </span>
+                    <HelpTooltip
+                      content={getHelpContent("advisoryVerificationStatus", language)}
+                      align="left"
+                      className="agap-household-print-hide"
+                    />
+                  </div>
                   <p className="mt-1 text-sm font-semibold text-slate-900">
                     {output.advisoryTitle ?? "—"}
                   </p>
@@ -732,9 +768,16 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
                 </div>
 
                 <div className="rounded-xl border border-slate-200 p-3.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {language === "en" ? "Advisory Validity" : "Advisory Validity"}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      {language === "en" ? "Advisory Valid Until" : "Balido ang Advisory Hanggang"}
+                    </span>
+                    <HelpTooltip
+                      content={getHelpContent("advisoryValidUntil", language)}
+                      align="right"
+                      className="agap-household-print-hide"
+                    />
+                  </div>
                   <p className="mt-1 text-sm font-semibold text-slate-900">
                     {output.advisoryValidity ?? "—"}
                   </p>
@@ -745,9 +788,18 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
               </div>
 
               <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                  {language === "en" ? "Approved Preparedness Actions" : "Approved Preparedness Actions"}
-                </h3>
+                <div className="flex items-center gap-1.5">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    {language === "en"
+                      ? "Approved Preparedness Actions"
+                      : "Approved Preparedness Actions"}
+                  </h3>
+                  <HelpTooltip
+                    content={getHelpContent("approvedPreparednessActions", language)}
+                    align="left"
+                    className="agap-household-print-hide"
+                  />
+                </div>
 
                 {output.actions.length > 0 ? (
                   <div className="mt-3 space-y-3">
@@ -769,7 +821,7 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
                               {action.explanation}
                             </p>
                             <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                              {language === "en" ? "Source Rule" : "Source Rule"}:{" "}
+                              {language === "en" ? "Guidance Source Reference" : "Reference ng Guidance"}:{" "}
                               {action.sourceRule ?? "—"}
                             </p>
                           </div>
@@ -781,8 +833,8 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
                   <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-5 text-center">
                     <p className="text-xs text-slate-500">
                       {language === "en"
-                        ? "No approved actions were supplied."
-                        : "Walang approved actions na ibinigay."}
+                        ? "No approved preparedness actions are available yet."
+                        : "Wala pang available na approved preparedness actions."}
                     </p>
                   </div>
                 )}
@@ -791,7 +843,7 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="rounded-xl border border-slate-200 p-3.5">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {language === "en" ? "Generated" : "Nagawa"}
+                    {language === "en" ? "Card Prepared" : "Oras ng Paghahanda ng Card"}
                   </span>
                   <p className="mt-1 text-xs font-semibold text-slate-800">
                     {output.generatedAt ?? "—"}
@@ -799,11 +851,18 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
                 </div>
 
                 <div className="rounded-xl border border-slate-200 p-3.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                    {language === "en" ? "Last Synchronization" : "Huling Synchronization"}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      {language === "en" ? "Last Data Sync" : "Huling Data Sync"}
+                    </span>
+                    <HelpTooltip
+                      content={getHelpContent("lastDataSync", language)}
+                      align="right"
+                      className="agap-household-print-hide"
+                    />
+                  </div>
                   <p className="mt-1 text-xs font-semibold text-slate-800">
-                    {output.lastSyncAt ?? "—"}
+                    {output.lastSyncAt ?? (language === "en" ? "Not available" : "Hindi available")}
                   </p>
                 </div>
               </div>
@@ -811,7 +870,7 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
               {output.limitations && output.limitations.length > 0 ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                   <h3 className="text-xs font-bold text-amber-900">
-                    {language === "en" ? "Limitations" : "Mga Limitasyon"}
+                    {language === "en" ? "Important Limitations" : "Mahahalagang Limitasyon"}
                   </h3>
                   <ul className="mt-2 space-y-1.5 text-xs leading-relaxed text-amber-900">
                     {output.limitations.map((item, index) => (
