@@ -134,6 +134,12 @@ export function OperationalWorkspace() {
   const reviewer = data?.role === "admin" || data?.role === "lgu_reviewer";
   const barangay = data?.barangays.find((b: Row) => b.id === barangayId);
   const advisory = data?.advisories.find((a: Row) => a.id === advisoryId);
+  const capacityRecords = data?.preparedness_capacities.filter(
+    (c: Row) => c.barangay_id === barangayId,
+  ) ?? [];
+  const hasValidatedCapacity = capacityRecords.some(
+    (capacity: Row) => Boolean(capacity.validation_date),
+  );
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30000);
@@ -731,16 +737,20 @@ export function OperationalWorkspace() {
                 </details>
                 <p className="text-sm text-slate-600">
                   Recorded capacity:{" "}
-                  {data.preparedness_capacities
-                    .filter((c: Row) => c.barangay_id === barangayId)
+                  {capacityRecords
                     .map(
                       (c: Row) =>
                         `${c.evacuation_capacity + c.temporary_shelter_capacity} persons; validated ${c.validation_date ?? "not yet"}; ${c.source}`,
                     )
                     .join(" · ") || "No validated capacity record."}
                 </p>
+                {!hasValidatedCapacity ? (
+                  <p className="text-sm font-medium text-amber-700" role="status">
+                    Record and validate preparedness capacity before generating an LGU action card.
+                  </p>
+                ) : null}
                 <Button
-                  disabled={!reviewer || busy || offline || stale}
+                  disabled={!reviewer || busy || offline || stale || !hasValidatedCapacity}
                   onClick={() =>
                     void run(
                       generateCard,
