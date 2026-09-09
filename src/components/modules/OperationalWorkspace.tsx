@@ -362,6 +362,18 @@ export function OperationalWorkspace() {
   async function loadActions(outputId: string) {
     setActions(await api<Row[]>(`/api/actions?outputId=${outputId}`));
   }
+  async function generateAssessment() {
+    if (!barangayId || !advisoryId || !selectedHazardId) {
+      throw new Error("Select a barangay, verified advisory, and hazard first.");
+    }
+    await post<Row>("/api/risk-assessments/from-stored-data", {
+      barangayId,
+      advisoryId,
+      hazardId: selectedHazardId,
+    });
+    await load();
+  }
+
   async function generateCard() {
     const result = await post<Row>("/api/action-cards/lgu", {
       barangayId,
@@ -872,10 +884,17 @@ export function OperationalWorkspace() {
                       The selected barangay and advisory do not yet have a complete stored assessment.
                     </p>
                     <ul className="mt-2 list-disc space-y-1 pl-5">
-                      {!selectedRisk ? <li>No risk assessment is stored for this advisory.</li> : null}
+                      {!selectedRisk ? <li>No advisory-specific risk assessment is stored yet.</li> : null}
                       {!selectedExposure ? <li>No population exposure estimate is stored for this hazard.</li> : null}
                       {!hasValidatedCapacity ? <li>No validated preparedness capacity record is available.</li> : null}
                     </ul>
+                    {!selectedRisk && reviewer && advisory?.verification_status === "VERIFIED" ? (
+                      <p className="mt-3 text-xs leading-5 text-amber-900">
+                        AGAP can create the advisory-specific assessment from the latest stored
+                        barangay-hazard baseline. The deterministic inputs, methodology, evidence
+                        date, and limitations are preserved and linked to this verified advisory.
+                      </p>
+                    ) : null}
                   </div>
                 ) : (
                   <>
@@ -986,6 +1005,27 @@ export function OperationalWorkspace() {
                   <Button disabled={busy || offline} onClick={() => void run(load, "Latest stored assessment data loaded.")}>
                     Refresh stored data
                   </Button>
+                  {!selectedRisk && (
+                    <Button
+                      disabled={
+                        !reviewer ||
+                        busy ||
+                        offline ||
+                        stale ||
+                        !advisoryId ||
+                        advisory?.verification_status !== "VERIFIED" ||
+                        !selectedHazardId
+                      }
+                      onClick={() =>
+                        void run(
+                          generateAssessment,
+                          "Advisory-specific assessment generated from the latest stored barangay-hazard baseline.",
+                        )
+                      }
+                    >
+                      Generate Assessment from Verified Data
+                    </Button>
+                  )}
                   <Button
                     disabled={!reviewer || busy || offline || stale || !assessmentReady}
                     onClick={() =>
