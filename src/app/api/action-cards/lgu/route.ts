@@ -23,10 +23,12 @@ export async function POST(request: Request) {
       Promise.resolve({ data: selectedAdvisory, error: null }),
       supabase.from("risk_assessments").select("*,methodologies(*)").eq("hazard_id", value.hazardId).eq("advisory_id", selectedAdvisory.id).eq("barangay_id", value.barangayId).order("assessment_date", { ascending: false }).limit(1).single(),
       supabase.from("population_exposure_estimates").select("*").eq("barangay_id", value.barangayId).eq("hazard_id", value.hazardId).order("generated_at", { ascending: false }).limit(1).single(),
-      supabase.from("preparedness_capacities").select("*").eq("barangay_id", value.barangayId).order("validation_date", { ascending: false }).limit(1).single(),
+      supabase.from("preparedness_capacities").select("*").eq("barangay_id", value.barangayId).order("validation_date", { ascending: false }).limit(1).maybeSingle(),
       supabase.from("critical_facilities").select("*").eq("barangay_id", value.barangayId), supabase.from("hazards").select("name").eq("id", value.hazardId).single(),
     ]);
-    for (const result of [barangay, advisory, risk, exposure, capacity, facilities, hazard]) if (result.error) throw new AppError("RECORD_NOT_FOUND", result.error.message, 404);
+    for (const result of [barangay, advisory, risk, exposure, facilities, hazard]) if (result.error) throw new AppError("RECORD_NOT_FOUND", result.error.message, 404);
+    if (capacity.error) throw new AppError("RECORD_NOT_FOUND", capacity.error.message, 404);
+    if (!capacity.data) throw new AppError("RECORD_NOT_FOUND", "No preparedness capacity record is available for this barangay. Record and validate capacity before generating an LGU action card.", 404);
     const a = camelAdvisory(advisory.data); const r: any = risk.data; const e: any = exposure.data; const c: any = capacity.data;
     if (!c.validation_date) throw new AppError("STALE_DATA", "Preparedness capacity must be validated before generating a card.", 409);
     const card = generateLGUActionCard({ barangay: barangay.data!.barangay_name, hazard: hazard.data!.name, advisory: a,

@@ -61,6 +61,16 @@ const formatFileSize = (bytes: number) => {
 const getFileExtension = (name: string) =>
   name.includes(".") ? name.split(".").pop()?.toLowerCase() ?? "" : "";
 
+const toDateTimeLocalValue = (value?: string) => {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.valueOf())) return "";
+
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
 export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
   initialValues,
   onCancel,
@@ -71,6 +81,8 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
   const [values, setValues] = useState<AdvisoryFormValues>({
     ...DEFAULT_VALUES,
     ...initialValues,
+    issuedTime: toDateTimeLocalValue(initialValues?.issuedTime),
+    validity: toDateTimeLocalValue(initialValues?.validity),
     precautions:
       initialValues?.precautions && initialValues.precautions.length > 0
         ? initialValues.precautions
@@ -124,6 +136,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             localSuccess:
               "Advisory information is ready for authorized review. It is not treated as verified until the required review is completed.",
             required: "This field is required.",
+            invalidDateRange: "Validity must be after the issued / updated time.",
             invalidUrl: "Enter a valid http:// or https:// source link.",
             precautionRequired: "Add at least one directive or precaution.",
             fileLabel: "Official advisory file",
@@ -175,6 +188,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             localSuccess:
               "Handa na ang advisory information para sa authorized review. Hindi ito itinuturing na verified hangga't hindi tapos ang required review.",
             required: "Kinakailangan ang field na ito.",
+            invalidDateRange: "Dapat ay mas huli ang validity kaysa sa oras ng paglabas / update.",
             invalidUrl: "Maglagay ng valid na http:// o https:// source link.",
             precautionRequired: "Magdagdag ng kahit isang tagubilin o pag-iingat.",
             fileLabel: "Official advisory file",
@@ -291,6 +305,17 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
     if (!values.issuedTime.trim()) nextErrors.issuedTime = copy.required;
     if (!values.bulletinNumber.trim()) nextErrors.bulletinNumber = copy.required;
     if (!values.validity.trim()) nextErrors.validity = copy.required;
+    if (values.issuedTime && values.validity) {
+      const issuedTime = new Date(values.issuedTime);
+      const validity = new Date(values.validity);
+      if (
+        Number.isNaN(issuedTime.valueOf()) ||
+        Number.isNaN(validity.valueOf()) ||
+        validity <= issuedTime
+      ) {
+        nextErrors.validity = copy.invalidDateRange;
+      }
+    }
     if (!values.affectedLocations.trim()) nextErrors.affectedLocations = copy.required;
     if (!values.warningInformation.trim()) nextErrors.warningInformation = copy.required;
     if (!values.sourceUrl.trim()) {
@@ -516,9 +541,10 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             helpContent={getHelpContent("advisoryIssuedTime", language)}
           >
             <input
+              type="datetime-local"
+              step="60"
               value={values.issuedTime}
               onChange={(event) => updateField("issuedTime", event.target.value)}
-              placeholder={copy.issuedPlaceholder}
               className={inputClass(Boolean(errors.issuedTime))}
               aria-invalid={Boolean(errors.issuedTime)}
             />
@@ -545,9 +571,10 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             helpContent={getHelpContent("advisoryValidUntil", language)}
           >
             <input
+              type="datetime-local"
+              step="60"
               value={values.validity}
               onChange={(event) => updateField("validity", event.target.value)}
-              placeholder={copy.validityPlaceholder}
               className={inputClass(Boolean(errors.validity))}
               aria-invalid={Boolean(errors.validity)}
             />
