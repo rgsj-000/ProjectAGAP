@@ -5,44 +5,50 @@ import {
   activeVerifiedAdvisory,
   camelAdvisory,
 } from "@/lib/server/repositories";
-import {
-  createAdminClient,
-  createPublicDataClient,
-} from "@/lib/server/supabase";
+import { createPublicDataClient } from "@/lib/server/supabase";
 import { householdRequest } from "@/lib/server/validation";
+
+type HouseholdLookupRow = {
+  household_code: string;
+  barangay_name: string;
+  household_members: number | null;
+  has_children: boolean;
+  has_older_person: boolean;
+  has_pwd_or_mobility_limitation: boolean;
+  needs_essential_medicine: boolean;
+  has_pets: boolean;
+  housing_characteristics: unknown;
+  communication_methods: string[];
+};
 
 export async function POST(request: Request) {
   try {
     const v = householdRequest.parse(await request.json());
+    const db = createPublicDataClient();
 
     let barangay: string;
     let profile: Record<string, unknown>;
     let code: string | undefined;
     const language = v.language;
 
-    /*
-     * Quick Profile and Generic Barangay Card are intentionally public and
-     * contain no stored household identity. Use the anon-key client for those
-     * flows so a service-role configuration problem cannot break public
-     * preparedness guidance.
-     *
-     * Household Code remains server-mediated with the service-role client
-     * because household_profiles must never be directly readable by anon.
-     */
-    const db =
-      v.mode === "code" ? createAdminClient() : createPublicDataClient();
-
     if (v.mode === "code") {
-      const { data, error } = await db
-        .from("household_profiles")
-        .select(
-          "household_code,household_members,has_children,has_older_person,has_pwd_or_mobility_limitation,needs_essential_medicine,has_pets,housing_characteristics,communication_methods,barangays!inner(barangay_name)",
-        )
-        .eq("household_code", v.householdCode.toUpperCase())
-        .maybeSingle();
+      /*
+       * Exact-code lookup is implemented as a SECURITY DEFINER RPC that exposes
+       * only the minimum non-identifying preparedness fields. anon still has
+       * no direct SELECT permission on household_profiles.
+       */
+      const normalizedCode = v.householdCode.trim().toUpperCase();
+      const { data, error } = await db.rpc("lookup_household_profile", {
+        p_household_code: normalizedCode,
+      });
 
       if (error) throw error;
-      if (!data) {
+
+      const row = (Array.isArray(data) ? data[0] : data) as
+        | HouseholdLookupRow
+        | undefined;
+
+      if (!row) {
         throw new AppError(
           "RECORD_NOT_FOUND",
           "Household code was not found.",
@@ -50,21 +56,17 @@ export async function POST(request: Request) {
         );
       }
 
-      const linkedBarangay = data.barangays as unknown as {
-        barangay_name: string;
-      };
-
-      barangay = linkedBarangay.barangay_name;
-      code = data.household_code;
+      barangay = row.barangay_name;
+      code = row.household_code;
       profile = {
-        householdSize: data.household_members,
-        hasInfantOrChild: data.has_children,
-        hasOlderPerson: data.has_older_person,
-        hasPwdOrMobilityLimitation: data.has_pwd_or_mobility_limitation,
-        hasEssentialMedicineNeed: data.needs_essential_medicine,
-        hasPets: data.has_pets,
-        housingCharacteristics: data.housing_characteristics,
-        communicationMethods: data.communication_methods,
+        householdSize: row.household_members,
+        hasInfantOrChild: row.has_children,
+        hasOlderPerson: row.has_older_person,
+        hasPwdOrMobilityLimitation: row.has_pwd_or_mobility_limitation,
+        hasEssentialMedicineNeed: row.needs_essential_medicine,
+        hasPets: row.has_pets,
+        housingCharacteristics: row.housing_characteristics,
+        communicationMethods: row.communication_methods ?? [],
       };
     } else {
       barangay = v.barangay;
@@ -93,30 +95,6 @@ export async function POST(request: Request) {
       rules,
       language,
     });
-
-    /*
-     * Persisting a generated public card is useful for audit/analytics but is
-     * not required to safely deliver guidance. Only the privileged code flow
-     * persists here; quick/generic generation must not depend on a secret.
-     */
-    if (v.mode === "code") {
-      const { error } = await db.from("generated_outputs").insert({
-        output_type: "HOUSEHOLD_ACTION_CARD",
-        content: card,
-        language,
-        source_snapshot: {
-          advisoryId: advisory.id,
-          ruleIds: card.actions.map((action) => action.id),
-        },
-      });
-
-      if (error) {
-        console.error("Unable to persist household action card", {
-          message: error.message,
-          code: error.code,
-        });
-      }
-    }
 
     return ok(card, 201);
   } catch (e) {
