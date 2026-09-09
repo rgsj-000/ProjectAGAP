@@ -106,7 +106,6 @@ export const ModulePlaceholder: React.FC = () => {
             initialValues={{
               title: advisoryTitle,
               source: advisory.source,
-              status: "ACTIVE",
               issuedTime: advisory.issuedTime,
               bulletinNumber: advisory.bulletinNumber,
               message:

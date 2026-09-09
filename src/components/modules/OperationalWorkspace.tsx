@@ -26,7 +26,6 @@ import { ConnectedHouseholdCard } from "@/components/household/ConnectedHousehol
 import { ConnectivityStatus } from "@/components/feedback/ConnectivityStatus";
 import { calculateRisk } from "@/lib/domain/riskEngine";
 import { assertCurrentAdvisory } from "@/lib/domain/advisory";
-import { ReferenceDataForms } from "./ReferenceDataForms";
 import { OfflineOperationsPack } from "./OfflineOperationsPack";
 
 type Row = Record<string, any>;
@@ -405,9 +404,6 @@ export function OperationalWorkspace() {
         </p>
       )}
       {contextSelector}
-      {view === "home" && reviewer && !offline && (
-        <ReferenceDataForms barangayId={barangayId} onSaved={load} />
-      )}
       {advisory?.is_demo && (
         <p className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-900">
           Synthetic demonstration advisory. Not official disaster information.
@@ -496,30 +492,6 @@ export function OperationalWorkspace() {
               />
             )}
           </Section>
-          <Section title="Current data">
-            <div className="grid grid-cols-2 gap-3">
-              {[
-                ["Barangays", data.barangays.length],
-                ["Risk assessments", data.risk_assessments.length],
-                [
-                  "Exposure estimates",
-                  data.population_exposure_estimates.length,
-                ],
-                ["Critical facilities", data.critical_facilities.length],
-              ].map(([label, n]) => (
-                <div key={label} className="rounded-xl bg-slate-50 p-4">
-                  <p className="text-2xl font-bold">{n}</p>
-                  <p className="text-sm text-slate-600">{label}</p>
-                </div>
-              ))}
-            </div>
-            <Button
-              disabled={busy || offline}
-              onClick={() => void run(load, "Data refreshed and cached.")}
-            >
-              Refresh data
-            </Button>
-          </Section>
         </>
       )}
       {view === "prepare" && (
@@ -547,12 +519,6 @@ export function OperationalWorkspace() {
                   className="space-y-4"
                   onSubmit={(e) =>
                     submit(e, async (f) => {
-                      if (
-                        Boolean(f.get("threat")) !== Boolean(f.get("adaptive"))
-                      )
-                        throw new Error(
-                          "Provide both threat and adaptive capacity, or leave both blank.",
-                        );
                       const input = {
                         barangayId,
                         advisoryId,
@@ -566,12 +532,6 @@ export function OperationalWorkspace() {
                           .split("\n")
                           .filter(Boolean),
                         confidenceLevel: f.get("confidence"),
-                        ...(f.get("threat") && f.get("adaptive")
-                          ? {
-                              threatLevel: Number(f.get("threat")),
-                              adaptiveCapacity: Number(f.get("adaptive")),
-                            }
-                          : {}),
                       };
                       if (offline) {
                         assertCurrentAdvisory(
@@ -634,22 +594,6 @@ export function OperationalWorkspace() {
                       name="severity"
                       type="number"
                       min={1}
-                    />
-                    <Field
-                      label="Threat level (optional pair)"
-                      name="threat"
-                      type="number"
-                      required={false}
-                      min={0}
-                      step="any"
-                    />
-                    <Field
-                      label="Adaptive capacity (optional pair)"
-                      name="adaptive"
-                      type="number"
-                      required={false}
-                      min={0}
-                      step="any"
                     />
                   </div>
                   <Field
