@@ -1189,6 +1189,7 @@ function ConnectedLguOutput({ card: c, stale }: { card: Row; stale: boolean }) {
         likelihood: str(w.riskInputs.likelihood),
         severity: str(w.riskInputs.severity),
         riskResult: str(w.riskResult),
+        riskCategory: str(c.situation.riskCategory),
         relativeVulnerability: w.relativeVulnerability ?? null,
         methodology: w.methodology
           ? `${w.methodology.name} · ${w.methodology.version} · ${w.methodology.source}`
@@ -1212,6 +1213,11 @@ function ConnectedLguOutput({ card: c, stale }: { card: Row; stale: boolean }) {
         criticalFacilityReadiness: p.criticalFacilities
           .map((f: Row) => `${f.name}: ${f.operationalStatus}`)
           .join("; "),
+        criticalFacilities: p.criticalFacilities.map((f: Row) => ({
+          name: f.name,
+          operationalStatus: str(f.operationalStatus),
+          capacity: str(f.capacity),
+        })),
         communicationCapability: str(p.communicationAccess),
       }}
       evidence={w.vulnerabilityEvidence ?? []}
@@ -1265,6 +1271,69 @@ function ConnectedPostOutput({ value }: { value: Row }) {
     />
   );
 }
+function renderAiInline(text: string): ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map((part, index) => {
+    const match = part.match(/^\*\*(.+)\*\*$/);
+    return match ? <strong key={index}>{match[1]}</strong> : <React.Fragment key={index}>{part}</React.Fragment>;
+  });
+}
+
+function ReadableAiBrief({ text }: { text: string }) {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  return (
+    <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/40 p-4 sm:p-5">
+      <div className="space-y-2 text-sm leading-relaxed text-slate-700">
+        {lines.map((rawLine, index) => {
+          const line = rawLine.trim();
+          if (!line) return <div key={index} className="h-1" aria-hidden="true" />;
+
+          const heading = line.match(/^#{1,4}\s+(.+)$/);
+          if (heading) {
+            return (
+              <h4 key={index} className="pt-2 text-base font-bold text-slate-950 first:pt-0">
+                {renderAiInline(heading[1])}
+              </h4>
+            );
+          }
+
+          const bullet = line.match(/^[-*]\s+(.+)$/);
+          if (bullet) {
+            return (
+              <div key={index} className="flex gap-2 pl-1">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600" aria-hidden="true" />
+                <p className="min-w-0">{renderAiInline(bullet[1])}</p>
+              </div>
+            );
+          }
+
+          const numbered = line.match(/^(\d+)\.\s+(.+)$/);
+          if (numbered) {
+            return (
+              <div key={index} className="flex gap-2 pl-1">
+                <span className="min-w-5 font-bold text-blue-700">{numbered[1]}.</span>
+                <p className="min-w-0">{renderAiInline(numbered[2])}</p>
+              </div>
+            );
+          }
+
+          return <p key={index}>{renderAiInline(line)}</p>;
+        })}
+      </div>
+    </div>
+  );
+}
+
+function friendlyOperationalMethod(value: unknown) {
+  if (!value) return "Not recorded";
+  const raw = String(value);
+  const labels: Record<string, string> = {
+    INHABITED_AREA_PROPORTIONAL_FALLBACK: "Inhabited area proportion estimate",
+    POPULATION_GRID_INTERSECTION: "Population grid intersection",
+    RESIDENTIAL_BUILDING_ESTIMATE: "Residential building estimate",
+  };
+  return labels[raw] ?? raw.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function PreparednessBrief({ card: c }: { card: Row }) {
   const a = c.situation.currentVerifiedAdvisory;
   const [aiBrief, setAiBrief] = useState("");
@@ -1363,7 +1432,7 @@ function PreparednessBrief({ card: c }: { card: Row }) {
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Potential exposure</p>
               <p className="mt-2 font-semibold">{display(e.estimatedPopulation)} persons / {display(e.estimatedHouseholds)} households</p>
               <p className="mt-1 text-slate-600">Confidence: {display(e.confidenceLevel)}</p>
-              <p className="text-slate-600">Method: {display(e.estimationMethod)}</p>
+              <p className="text-slate-600">Method: {friendlyOperationalMethod(e.estimationMethod)}</p>
             </div>
           </div>
         </section>
@@ -1421,7 +1490,7 @@ function PreparednessBrief({ card: c }: { card: Row }) {
             </Button>
           </div>
           {aiError ? <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{aiError}</p> : null}
-          {aiBrief ? <p className="mt-3 whitespace-pre-wrap rounded-xl border border-blue-200 bg-blue-50/50 p-4 leading-relaxed text-slate-800">{aiBrief}</p> : null}
+          {aiBrief ? <ReadableAiBrief text={aiBrief} /> : null}
         </section>
 
         <p className="border-l-4 border-amber-400 bg-amber-50 p-4 font-semibold leading-relaxed text-amber-950">
