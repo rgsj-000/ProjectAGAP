@@ -4,10 +4,14 @@ export const uuid = z.string().uuid();
 export const verificationState = z.enum(["UNVERIFIED", "FOR_REVIEW", "VERIFIED", "REJECTED"]);
 export const advisoryFields = z.object({
   evidence: z.object({ type: z.string().max(100), reference: z.string().max(500) }).optional(),
+  sourceCoverageLevel: z.enum(["PROVINCE","CITY_MUNICIPALITY","BARANGAY","SPECIFIC_AREA"]),
+  sourceAffectedAreas: z.array(z.string().trim().min(1)).min(1).max(100),
   sourceAgency: z.string().trim().min(2).max(150), advisoryType: z.string().trim().min(2).max(100),
   bulletinReference: z.string().trim().min(1).max(150), warningInformation: z.string().trim().min(1).max(10000),
+  message: z.string().trim().min(1).max(10000).optional(),
+  precautions: z.array(z.string().trim().min(1).max(2000)).max(30).optional(),
   issueTime: z.coerce.date(), validityStart: z.coerce.date(), validityEnd: z.coerce.date(),
-  affectedAreas: z.array(z.string().trim().min(1)).min(1).max(100), sourceLink: z.string().url(),
+  affectedAreas: z.array(z.string().trim().min(1)).min(1).max(100).optional(), sourceLink: z.string().url(),
 });
 export const advisoryInput = advisoryFields.refine(v => v.validityEnd > v.validityStart, { message: "Validity end must be after validity start.", path: ["validityEnd"] });
 export const advisoryUpdateInput = advisoryFields.partial().refine(v => !v.validityStart || !v.validityEnd || v.validityEnd > v.validityStart, { message: "Validity end must be after validity start.", path: ["validityEnd"] });

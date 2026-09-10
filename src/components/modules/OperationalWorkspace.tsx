@@ -8,7 +8,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useNavigation } from "@/context/NavigationContext";
-import { api, saveAdvisory } from "@/lib/client/api";
+import { api, deleteAdvisory, saveAdvisory, updateAdvisory } from "@/lib/client/api";
 import { createSupabaseBrowserClient as createBrowserClient } from "@/lib/client/supabase";
 import {
   cacheOfflinePack,
@@ -24,8 +24,6 @@ import { LGUActionCard } from "@/components/assessment/LGUActionCard";
 import { PostImpactActionCard } from "@/components/recovery/PostImpactActionCard";
 import { ConnectedHouseholdCard } from "@/components/household/ConnectedHouseholdCard";
 import { ConnectivityStatus } from "@/components/feedback/ConnectivityStatus";
-import { calculateRisk } from "@/lib/domain/riskEngine";
-import { assertCurrentAdvisory } from "@/lib/domain/advisory";
 import { OfflineOperationsPack } from "./OfflineOperationsPack";
 
 type Row = Record<string, any>;
@@ -128,24 +126,138 @@ export function OperationalWorkspace() {
   const [postImpact, setPostImpact] = useState<Row | null>(null);
   const [reports, setReports] = useState<Row[]>([]);
   const [actions, setActions] = useState<Row[]>([]);
-  const [localRisk, setLocalRisk] = useState<Row | null>(null);
   const [queue, setQueue] = useState<PendingFieldReport[]>([]);
   const [conflicts, setConflicts] = useState<Row[]>([]);
   const [auditRows, setAuditRows] = useState<Row[]>([]);
   const [offline, setOffline] = useState(false);
   const [showAdvisory, setShowAdvisory] = useState(false);
-  const [workingLabel, setWorkingLabel] = useState("Working…");
-  const [reviewDialog, setReviewDialog] = useState<ReviewDialog | null>(null);
-  const [reviewReason, setReviewReason] = useState("");
   const reviewer = data?.role === "admin" || data?.role === "lgu_reviewer";
   const barangay = data?.barangays.find((b: Row) => b.id === barangayId);
   const advisory = data?.advisories.find((a: Row) => a.id === advisoryId);
-  const capacityRecords = data?.preparedness_capacities.filter(
-    (c: Row) => c.barangay_id === barangayId,
-  ) ?? [];
-  const hasValidatedCapacity = capacityRecords.some(
-    (capacity: Row) => Boolean(capacity.validation_date),
+  const editingAdvisory = data?.advisories.find((a: Row) => a.id === editingAdvisoryId);
+  const advisoryInitialValues = editingAdvisory
+    ? {
+        title: editingAdvisory.advisory_type,
+        source: editingAdvisory.source_agency,
+        issuedTime: editingAdvisory.issue_time,
+        bulletinNumber: editingAdvisory.bulletin_reference,
+        validity: editingAdvisory.validity_end,
+        coverageLevel:
+          editingAdvisory.raw_content?.sourceCoverage?.level ?? "SPECIFIC_AREA",
+        affectedLocations:
+          editingAdvisory.raw_content?.sourceCoverage?.areas?.join(", ") ??
+          editingAdvisory.affected_areas?.join(", ") ??
+          "",
+        warningInformation: editingAdvisory.warning_information,
+        sourceUrl: editingAdvisory.source_link,
+        message: editingAdvisory.raw_content?.sourceMessage ?? "",
+        precautions: editingAdvisory.raw_content?.sourcePrecautions ?? [""],
+      }
+    : undefined;
+  const pendingAdvisories =
+    data?.advisories.filter((a: Row) =>
+      ["FOR_REVIEW", "UNVERIFIED"].includes(a.verification_status),
+    ) ?? [];
+  const reviewAdvisory =
+    data?.advisories.find((a: Row) => a.id === reviewAdvisoryId) ??
+    pendingAdvisories[0] ??
+    null;
+  const rowTime = (value: unknown) => {
+    const parsed = Date.parse(String(value ?? ""));
+    return Number.isNaN(parsed) ? 0 : parsed;
+  };
+  const asList = (value: unknown) =>
+    Array.isArray(value)
+      ? value.map((item) => String(item)).filter(Boolean)
+      : value
+        ? [String(value)]
+        : [];
+  const formatCount = (value: unknown) => {
+    const number = Number(value);
+    return Number.isFinite(number)
+      ? new Intl.NumberFormat("en-PH", { maximumFractionDigits: 0 }).format(number)
+      : "Not recorded";
+  };
+  const formatRecordDate = (value: unknown) => {
+    if (!value) return "Not recorded";
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime())
+      ? String(value)
+      : new Intl.DateTimeFormat("en-PH", { dateStyle: "medium" }).format(date);
+  };
+  const selectedRisk = data
+    ? [...(data.risk_assessments ?? [])]
+        .filter(
+          (risk: Row) =>
+            risk.barangay_id === barangayId &&
+            risk.advisory_id === advisoryId,
+        )
+        .sort(
+          (a: Row, b: Row) =>
+            rowTime(b.assessment_date ?? b.data_date) -
+            rowTime(a.assessment_date ?? a.data_date),
+        )[0]
+    : undefined;
+  const selectedHazardId = selectedRisk?.hazard_id || hazardId;
+  const hazard = data?.hazards.find((h: Row) => h.id === selectedHazardId);
+  const methodology = data?.methodologies.find(
+    (m: Row) => m.id === selectedRisk?.methodology_id,
   );
+  const selectedExposure = data
+    ? [...(data.population_exposure_estimates ?? [])]
+        .filter(
+          (exposure: Row) =>
+            exposure.barangay_id === barangayId &&
+            exposure.hazard_id === selectedHazardId,
+        )
+        .sort(
+          (a: Row, b: Row) =>
+            rowTime(b.generated_at ?? b.reference_date) -
+            rowTime(a.generated_at ?? a.reference_date),
+        )[0]
+    : undefined;
+  const capacityRecords =
+    data?.preparedness_capacities.filter(
+      (capacity: Row) => capacity.barangay_id === barangayId,
+    ) ?? [];
+  const latestCapacity = [...capacityRecords]
+    .filter((capacity: Row) => Boolean(capacity.validation_date))
+    .sort(
+      (a: Row, b: Row) =>
+        rowTime(b.validation_date) - rowTime(a.validation_date),
+    )[0];
+  const hasValidatedCapacity = Boolean(latestCapacity?.validation_date);
+  const recordedCapacity = latestCapacity
+    ? Number(latestCapacity.evacuation_capacity ?? 0) +
+      Number(latestCapacity.temporary_shelter_capacity ?? 0)
+    : null;
+  const estimatedExposure = selectedExposure
+    ? Number(selectedExposure.estimated_exposed_population)
+    : null;
+  const capacityGap =
+    estimatedExposure !== null &&
+    Number.isFinite(estimatedExposure) &&
+    recordedCapacity !== null &&
+    Number.isFinite(recordedCapacity)
+      ? estimatedExposure - recordedCapacity
+      : null;
+  const assessmentReady = Boolean(
+    selectedRisk &&
+      selectedExposure &&
+      selectedHazardId &&
+      hasValidatedCapacity,
+  );
+  const assessmentLimitations = [
+    ...asList(selectedRisk?.limitations),
+    ...asList(selectedExposure?.limitations),
+    ...asList(latestCapacity?.limitations),
+  ];
+  const riskTone: Record<string, string> = {
+    VERY_HIGH: "border-red-200 bg-red-50 text-red-800",
+    HIGH: "border-orange-200 bg-orange-50 text-orange-800",
+    MODERATE: "border-amber-200 bg-amber-50 text-amber-800",
+    LOW: "border-emerald-200 bg-emerald-50 text-emerald-800",
+  };
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30000);
@@ -230,7 +342,6 @@ export function OperationalWorkspace() {
     setPostImpact(null);
     setActions([]);
     setReports([]);
-    setLocalRisk(null);
     if (!data?.userId || !barangayId) return;
     let current = true;
     void readOfflinePack<Row>(
@@ -273,10 +384,22 @@ export function OperationalWorkspace() {
   async function loadActions(outputId: string) {
     setActions(await api<Row[]>(`/api/actions?outputId=${outputId}`));
   }
+  async function generateAssessment() {
+    if (!barangayId || !advisoryId || !selectedHazardId) {
+      throw new Error("Select a barangay, verified advisory, and hazard first.");
+    }
+    await post<Row>("/api/risk-assessments/from-stored-data", {
+      barangayId,
+      advisoryId,
+      hazardId: selectedHazardId,
+    });
+    await load();
+  }
+
   async function generateCard() {
     const result = await post<Row>("/api/action-cards/lgu", {
       barangayId,
-      hazardId,
+      hazardId: selectedHazardId,
       advisoryId,
     });
     if (!result?.situation || !result.outputId) {
@@ -284,7 +407,7 @@ export function OperationalWorkspace() {
     }
     setCard(result);
     await cacheOfflinePack(
-      `lgu:${data!.userId}:${barangayId}:${advisoryId}:${hazardId}`,
+      `lgu:${data!.userId}:${barangayId}:${advisoryId}:${selectedHazardId}`,
       result,
     );
     await loadActions(result.outputId);
@@ -332,6 +455,12 @@ export function OperationalWorkspace() {
             )[0]?.id ?? ""),
     );
   }, [barangayId, data]);
+  useEffect(() => {
+    const assessedHazardId = selectedRisk?.hazard_id;
+    if (assessedHazardId && assessedHazardId !== hazardId) {
+      setHazardId(assessedHazardId);
+    }
+  }, [selectedRisk?.hazard_id, hazardId]);
   const submit = (
     e: FormEvent<HTMLFormElement>,
     fn: (form: FormData) => Promise<void>,
@@ -471,6 +600,212 @@ export function OperationalWorkspace() {
       )}
       {view === "home" && (
         <>
+          {!reviewer && pendingAdvisories.length > 0 && (
+            <Section title="Advisories awaiting verification">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-bold text-amber-950">
+                  {pendingAdvisories.length} advisory record(s) are waiting for an Admin or LGU Reviewer.
+                </p>
+                <p className="mt-1 text-sm leading-6 text-amber-900">
+                  Encoders can upload and correct advisory information, but they cannot mark an advisory as VERIFIED.
+                  This separation keeps source verification independent from data entry.
+                </p>
+              </div>
+            </Section>
+          )}
+
+          {reviewer && (
+            <Section title="Pending advisory verification">
+              <p className="text-sm text-slate-600">
+                Verify each official advisory once. Confirm the uploaded source,
+                extracted fields, source geographic coverage, and the resolved
+                Lucena City barangay applicability before approval.
+              </p>
+
+              {pendingAdvisories.length === 0 ? (
+                <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">
+                  No advisories are waiting for verification.
+                </p>
+              ) : (
+                <div className="grid gap-4 lg:grid-cols-[280px_1fr]">
+                  <div className="space-y-2">
+                    {pendingAdvisories.map((item: Row) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setReviewAdvisoryId(item.id);
+                          setReviewEvidenceUrl("");
+                          setReviewReason("");
+                        }}
+                        className={`w-full rounded-xl border p-3 text-left text-sm transition-colors ${
+                          reviewAdvisory?.id === item.id
+                            ? "border-blue-400 bg-blue-50"
+                            : "border-slate-200 bg-white hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="block font-bold text-slate-900">
+                          {item.bulletin_reference}
+                        </span>
+                        <span className="mt-1 block text-xs text-slate-600">
+                          {item.source_agency} · {item.verification_status}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {reviewAdvisory && (
+                    <div className="space-y-4 rounded-2xl border border-slate-200 p-4">
+                      <div>
+                        <p className="text-xs font-bold uppercase tracking-wide text-blue-700">
+                          Source record
+                        </p>
+                        <h3 className="mt-1 font-bold text-slate-900">
+                          {reviewAdvisory.advisory_type} ·{" "}
+                          {reviewAdvisory.bulletin_reference}
+                        </h3>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-xl bg-slate-50 p-3">
+                          <p className="text-xs font-bold text-slate-700">
+                            Source geographic coverage
+                          </p>
+                          <p className="mt-1 text-sm">
+                            {reviewAdvisory.raw_content?.sourceCoverage?.level ??
+                              "Not recorded"}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-600">
+                            {(reviewAdvisory.raw_content?.sourceCoverage?.areas ?? []).join(
+                              ", ",
+                            ) || "No source areas recorded"}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl bg-slate-50 p-3">
+                          <p className="text-xs font-bold text-slate-700">
+                            Resolved AGAP applicability
+                          </p>
+                          <p className="mt-1 text-sm">
+                            {reviewAdvisory.affected_areas?.length
+                              ? `${reviewAdvisory.affected_areas.length} Lucena City barangay(s)`
+                              : "No Lucena City barangays matched"}
+                          </p>
+                          <p className="mt-1 max-h-24 overflow-auto text-xs text-slate-600">
+                            {reviewAdvisory.affected_areas?.join(", ") ||
+                              "This official advisory may be outside the current LGU jurisdiction."}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 p-3">
+                        <p className="text-xs font-bold text-slate-700">
+                          Extracted warning information
+                        </p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-slate-700">
+                          {reviewAdvisory.warning_information}
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          disabled={busy || offline}
+                          onClick={() =>
+                            void run(async () => {
+                              const result = await api<{ url: string }>(
+                                `/api/advisories/${reviewAdvisory.id}/evidence`,
+                              );
+                              setReviewEvidenceUrl(result.url);
+                            }, "Uploaded evidence opened for review.")
+                          }
+                        >
+                          Load uploaded evidence
+                        </Button>
+                        <a
+                          href={reviewAdvisory.source_link}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex min-h-11 items-center rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700"
+                        >
+                          Open official source
+                        </a>
+                      </div>
+
+                      {reviewEvidenceUrl && (
+                        <iframe
+                          src={reviewEvidenceUrl}
+                          title="Uploaded advisory evidence"
+                          className="h-[520px] w-full rounded-xl border border-slate-200 bg-white"
+                        />
+                      )}
+
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                        <p className="text-xs font-bold text-amber-900">
+                          Reviewer confirmation
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-amber-800">
+                          Verify only after the uploaded file and official source
+                          support the extracted facts and the geographic
+                          applicability shown above.
+                        </p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          disabled={busy || offline}
+                          onClick={() =>
+                            void run(async () => {
+                              await post(
+                                `/api/advisories/${reviewAdvisory.id}/verify`,
+                                {},
+                              );
+                              setReviewEvidenceUrl("");
+                              setReviewAdvisoryId("");
+                              await load();
+                            }, "Advisory verified once for all resolved barangays.")
+                          }
+                        >
+                          Verify advisory
+                        </Button>
+                      </div>
+
+                      <div className="space-y-2 border-t border-slate-200 pt-3">
+                        <label className="block text-sm font-medium text-slate-700">
+                          Return for correction
+                          <textarea
+                            className={`${inputClass} min-h-24`}
+                            value={reviewReason}
+                            onChange={(e) => setReviewReason(e.target.value)}
+                            placeholder="State what must be corrected before verification."
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          disabled={busy || offline || reviewReason.trim().length < 5}
+                          onClick={() =>
+                            void run(async () => {
+                              await post(
+                                `/api/advisories/${reviewAdvisory.id}/return`,
+                                { reason: reviewReason.trim() },
+                              );
+                              setReviewEvidenceUrl("");
+                              setReviewAdvisoryId("");
+                              setReviewReason("");
+                              await load();
+                            }, "Advisory returned for correction.")
+                          }
+                          className="min-h-11 rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-900 disabled:opacity-50"
+                        >
+                          Return for correction
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Section>
+          )}
+
           <Section title="Advisory intake & verification">
             {advisory ? (
               <>
@@ -501,59 +836,193 @@ export function OperationalWorkspace() {
                 disabled={
                   busy || offline || data.role === "field_reporter" || isFieldResponderUser
                 }
-                onClick={() => setShowAdvisory(!showAdvisory)}
+                onClick={() => {
+                  setEditingAdvisoryId("");
+                  setShowAdvisory(!showAdvisory);
+                }}
               >
-                Enter advisory
+                Create advisory
               </Button>
-              <Button
-                disabled={
-                  !reviewer ||
-                  busy ||
-                  offline ||
-                  !advisory ||
-                  advisory.verification_status === "VERIFIED"
-                }
-                onClick={() =>
-                  void run(async () => {
-                    await post(`/api/advisories/${advisoryId}/verify`, {});
-                    await load();
-                  }, "Advisory verified and audit recorded.")
-                }
-              >
-                Verify source & advisory
-              </Button>
+              {reviewer && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReviewAdvisoryId(advisoryId);
+                    setReviewEvidenceUrl("");
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  className="min-h-11 rounded-xl border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-800"
+                >
+                  Review & verify selected advisory
+                </button>
+              )}
               <Button onClick={() => setCurrentModule("prepare")}>
                 Open assessment
               </Button>
             </div>
-            {showAdvisory && (
-              <AdvisoryForm
-                onCancel={() => setShowAdvisory(false)}
-                onSave={async (values, file) => {
-                  let evidence: unknown;
-                  if (file) {
-                    const form = new FormData();
-                    form.set("file", file);
-                    form.set("kind", "advisory");
-                    const response = await fetch("/api/evidence", {
-                      method: "POST",
-                      body: form,
-                    });
-                    const result = await response.json();
-                    if (!response.ok)
-                      throw new Error(result.error?.message ?? "Upload failed");
-                    evidence = result.data;
-                  }
-                  await saveAdvisory(values, evidence);
-                  await load();
-                  setShowAdvisory(false);
-                  setMessage(
-                    "Advisory saved as unverified. A reviewer must verify it before assessment.",
-                  );
-                }}
-              />
-            )}
           </Section>
+
+          {(data.role === "admin" || data.role === "lgu_reviewer" || data.role === "lgu_encoder") && (
+            <Section title="Advisory records">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Manage source records
+                  </p>
+                  <p className="text-xs leading-5 text-slate-500">
+                    Editing changes a record back to FOR REVIEW. Delete is restricted to unused records and Admin users.
+                  </p>
+                </div>
+                <span className="text-xs font-medium text-slate-500">
+                  {data.advisories.length} record{data.advisories.length === 1 ? "" : "s"}
+                </span>
+              </div>
+
+              <div className="overflow-hidden rounded-xl border border-slate-200">
+                <div className="hidden grid-cols-[minmax(0,1fr)_120px_150px_190px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 md:grid">
+                  <span>Advisory</span>
+                  <span>Status</span>
+                  <span>Issued</span>
+                  <span className="text-right">Record actions</span>
+                </div>
+
+                <div className="divide-y divide-slate-200">
+                  {[...data.advisories]
+                    .sort((a: Row, b: Row) => rowTime(b.issue_time) - rowTime(a.issue_time))
+                    .map((item: Row) => (
+                      <div
+                        key={item.id}
+                        className={`grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_120px_150px_190px] md:items-center ${
+                          item.id === advisoryId ? "bg-blue-50/40" : "bg-white"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setAdvisoryId(item.id)}
+                          className="min-w-0 text-left"
+                        >
+                          <p className="truncate text-sm font-bold text-slate-900">
+                            {item.advisory_type}
+                          </p>
+                          <p className="mt-0.5 truncate text-xs text-slate-500">
+                            {item.bulletin_reference} · {item.source_agency}
+                          </p>
+                        </button>
+
+                        <div>
+                          <span
+                            className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                              item.verification_status === "VERIFIED"
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                : item.verification_status === "FOR_REVIEW"
+                                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                                  : "border-slate-200 bg-slate-50 text-slate-700"
+                            }`}
+                          >
+                            {item.verification_status.replaceAll("_", " ")}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-slate-600">
+                          {formatRecordDate(item.issue_time)}
+                        </p>
+
+                        <div className="flex flex-wrap gap-2 md:justify-end">
+                          <button
+                            type="button"
+                            disabled={busy || offline}
+                            onClick={() => {
+                              setAdvisoryId(item.id);
+                              setEditingAdvisoryId(item.id);
+                              setShowAdvisory(true);
+                            }}
+                            className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            Edit
+                          </button>
+                          {data.role === "admin" && (
+                            <button
+                              type="button"
+                              disabled={busy || offline}
+                              onClick={() =>
+                                void run(async () => {
+                                  const confirmed = window.confirm(
+                                    `Delete ${item.bulletin_reference}? Advisories already used by assessments or incident records cannot be deleted.`,
+                                  );
+                                  if (!confirmed) throw new Error("Deletion cancelled.");
+                                  await deleteAdvisory(item.id);
+                                  if (advisoryId === item.id) setAdvisoryId("");
+                                  if (editingAdvisoryId === item.id) {
+                                    setEditingAdvisoryId("");
+                                    setShowAdvisory(false);
+                                  }
+                                  await load();
+                                }, "Advisory deleted.")
+                              }
+                              className="min-h-9 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              {showAdvisory && (
+                <div className="border-t border-slate-200 pt-5">
+                  <AdvisoryForm
+                    key={editingAdvisoryId || "create-advisory"}
+                    initialValues={advisoryInitialValues}
+                    onCancel={() => {
+                      setShowAdvisory(false);
+                      setEditingAdvisoryId("");
+                    }}
+                    onSave={async (values, file) => {
+                      let evidence: unknown;
+                      if (file) {
+                        const form = new FormData();
+                        form.set("file", file);
+                        form.set("kind", "advisory");
+                        const response = await fetch("/api/evidence", {
+                          method: "POST",
+                          body: form,
+                        });
+                        const result = await response.json();
+                        if (!response.ok)
+                          throw new Error(result.error?.message ?? "Upload failed");
+                        evidence = result.data;
+                      }
+                      const wasEditing = Boolean(editingAdvisoryId);
+                      const saved = editingAdvisoryId
+                        ? (await updateAdvisory(editingAdvisoryId, values, evidence) as Row)
+                        : (await saveAdvisory(values, evidence) as Row);
+                      await load();
+                      setShowAdvisory(false);
+                      setEditingAdvisoryId("");
+                      setAdvisoryId(saved.id);
+                      if (reviewer) {
+                        setReviewAdvisoryId(saved.id);
+                        setReviewEvidenceUrl("");
+                        setReviewReason("");
+                        setMessage(
+                          wasEditing
+                            ? "Advisory updated and returned to FOR REVIEW. Review the source again before verification."
+                            : "Advisory submitted. Review the uploaded evidence and click Verify advisory to activate it.",
+                        );
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      } else {
+                        setMessage(
+                          "Advisory submitted as FOR REVIEW. An Admin or LGU Reviewer must verify it before it becomes active.",
+                        );
+                      }
+                    }}
+                  />
+                </div>
+              )}
+            </Section>
+          )}
         </>
       )}
       {view === "prepare" && (
@@ -562,241 +1031,196 @@ export function OperationalWorkspace() {
             <ConnectedHouseholdCard />
           ) : (
             <>
-              <Section title="Risk, exposure & capacity">
-                <label className="block text-sm font-medium">
-                  Hazard
-                  <select
-                    value={hazardId}
-                    onChange={(e) => setHazardId(e.target.value)}
-                    className={inputClass}
-                  >
-                    {data.hazards.map((h: Row) => (
-                      <option key={h.id} value={h.id}>
-                        {h.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <form
-                  className="space-y-4"
-                  onSubmit={(e) =>
-                    submit(e, async (f) => {
-                      const input = {
-                        barangayId,
-                        advisoryId,
-                        hazardId,
-                        dataDate: f.get("dataDate"),
-                        methodologyId: f.get("methodology"),
-                        likelihood: Number(f.get("likelihood")),
-                        severity: Number(f.get("severity")),
-                        evidence: [String(f.get("evidence"))],
-                        limitations: String(f.get("limitations") || "")
-                          .split("\n")
-                          .filter(Boolean),
-                        confidenceLevel: f.get("confidence"),
-                      };
-                      if (offline) {
-                        assertCurrentAdvisory(
-                          {
-                            verificationStatus: advisory.verification_status,
-                            validityStart: advisory.validity_start,
-                            validityEnd: advisory.validity_end,
-                            affectedAreas: advisory.affected_areas,
-                          },
-                          barangay.barangay_name,
-                        );
-                        const method = data.methodologies.find(
-                          (m: Row) => m.id === input.methodologyId,
-                        );
-                        if (!method) throw new Error("No cached methodology.");
-                        const result = calculateRisk(
-                          {
-                            name: method.name,
-                            version: method.version,
-                            likelihoodScale: method.likelihood_scale,
-                            severityScale: method.severity_scale,
-                            parameters: method.parameters,
-                          },
-                          input,
-                        );
-                        setLocalRisk(result);
-                        await cacheOfflinePack(
-                          `local-risk:${data.userId}:${barangayId}`,
-                          result,
-                        );
-                      } else {
-                        await post("/api/risk-assessments", input);
-                        setLocalRisk(null);
-                        await load();
-                      }
-                    })
-                  }
-                >
-                  <label className="block text-sm font-medium">
-                    Adopted methodology
-                    <select name="methodology" className={inputClass} required>
-                      {data.methodologies
-                        .filter((m: Row) => m.active_status)
-                        .map((m: Row) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name} · {m.version} · {m.source}
-                          </option>
-                        ))}
-                    </select>
-                  </label>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <Field
-                      label="Likelihood (adopted scale)"
-                      name="likelihood"
-                      type="number"
-                      min={1}
-                    />
-                    <Field
-                      label="Severity (adopted scale)"
-                      name="severity"
-                      type="number"
-                      min={1}
-                    />
+              <Section title="Risk assessment">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-blue-700">
+                      Automatically loaded from stored assessment records
+                    </p>
+                    <h3 className="mt-1 text-xl font-black text-slate-950">
+                      {hazard?.name ?? "No hazard assessment available"}
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {barangay?.barangay_name ?? "Selected barangay"} ·{" "}
+                      {advisory?.bulletin_reference ?? "No advisory selected"}
+                    </p>
                   </div>
-                  <Field
-                    label="Assessment source data date"
-                    name="dataDate"
-                    type="date"
-                  />
-                  <Field
-                    label="Verified evidence / source reference"
-                    name="evidence"
-                  />
-                  <Field
-                    label="Limitations / missing information"
-                    name="limitations"
-                    required={false}
-                  />
-                  <label className="block text-sm">
-                    Confidence
-                    <select className={inputClass} name="confidence">
-                      <option>LOW</option>
-                      <option>MEDIUM</option>
-                      <option>HIGH</option>
-                    </select>
-                  </label>
-                  <Button
-                    type="submit"
-                    disabled={!reviewer || busy || !advisoryId || stale}
+                  <span
+                    className={`inline-flex w-fit rounded-full border px-3 py-1 text-xs font-bold tracking-wide ${
+                      riskTone[selectedRisk?.risk_category] ??
+                      "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}
                   >
-                    {offline
-                      ? "Calculate offline draft"
-                      : "Calculate & save assessment"}
-                  </Button>
-                </form>
-                {localRisk && (
-                  <p
-                    role="status"
-                    className="rounded-xl bg-amber-50 p-4 text-sm"
-                  >
-                    Offline draft: {localRisk.calculation} ·{" "}
-                    {localRisk.riskCategory} · {localRisk.methodologyName}{" "}
-                    {localRisk.methodologyVersion}. Cached methodology; not a
-                    newly verified server assessment.
-                  </p>
+                    {selectedRisk?.risk_category
+                      ? `${selectedRisk.risk_category} RISK`
+                      : "DATA REQUIRED"}
+                  </span>
+                </div>
+
+                {!assessmentReady ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950" role="status">
+                    <p className="font-bold">
+                      The selected barangay and advisory do not yet have a complete stored assessment.
+                    </p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5">
+                      {!selectedRisk ? <li>No advisory-specific risk assessment is stored yet.</li> : null}
+                      {!selectedExposure ? <li>No population exposure estimate is stored for this hazard.</li> : null}
+                      {!hasValidatedCapacity ? <li>No validated preparedness capacity record is available.</li> : null}
+                    </ul>
+                    {!selectedRisk && reviewer && advisory?.verification_status === "VERIFIED" ? (
+                      <p className="mt-3 text-xs leading-5 text-amber-900">
+                        AGAP can create the advisory-specific assessment from the latest stored
+                        barangay-hazard baseline. The deterministic inputs, methodology, evidence
+                        date, and limitations are preserved and linked to this verified advisory.
+                      </p>
+                    ) : null}
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Likelihood</p>
+                        <p className="mt-2 text-2xl font-black text-slate-950">
+                          {selectedRisk.likelihood}
+                          <span className="ml-1 text-sm font-semibold text-slate-500">/ {methodology?.likelihood_scale?.max ?? 5}</span>
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Severity</p>
+                        <p className="mt-2 text-2xl font-black text-slate-950">
+                          {selectedRisk.severity}
+                          <span className="ml-1 text-sm font-semibold text-slate-500">/ {methodology?.severity_scale?.max ?? 5}</span>
+                        </p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Risk score</p>
+                        <p className="mt-2 text-2xl font-black text-slate-950">
+                          {selectedRisk.risk_result}
+                          <span className="ml-1 text-sm font-semibold text-slate-500">/ 25</span>
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {selectedRisk.likelihood} × {selectedRisk.severity} = {selectedRisk.risk_result}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 lg:grid-cols-3">
+                      <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-blue-700">Estimated potentially exposed</p>
+                        <p className="mt-2 text-2xl font-black text-slate-950">
+                          {formatCount(selectedExposure.estimated_exposed_population)}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-600">
+                          {formatCount(selectedExposure.estimated_households)} estimated households
+                        </p>
+                        <p className="mt-2 text-xs text-slate-500">Confidence: {selectedExposure.confidence_level ?? "Not recorded"}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Recorded preparedness capacity</p>
+                        <p className="mt-2 text-2xl font-black text-slate-950">{formatCount(recordedCapacity)}</p>
+                        <p className="mt-1 text-sm text-slate-600">Validated {formatRecordDate(latestCapacity.validation_date)}</p>
+                        <p className="mt-2 text-xs text-slate-500">{latestCapacity.source}</p>
+                      </div>
+                      <div className={`rounded-xl border p-4 ${capacityGap !== null && capacityGap > 0 ? "border-amber-200 bg-amber-50" : "border-emerald-200 bg-emerald-50"}`}>
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-600">Potential capacity gap</p>
+                        <p className="mt-2 text-2xl font-black text-slate-950">{formatCount(capacityGap)}</p>
+                        <p className="mt-1 text-sm text-slate-600">
+                          {capacityGap !== null && capacityGap > 0
+                            ? "Possible shortfall requiring LGU validation"
+                            : "No positive shortfall indicated by stored values"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="rounded-xl border border-slate-200 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Adopted methodology</p>
+                        <p className="mt-2 font-semibold text-slate-900">
+                          {methodology ? `${methodology.name} · ${methodology.version}` : "Methodology record unavailable"}
+                        </p>
+                        <p className="mt-1 text-sm text-slate-600">{methodology?.source ?? "Source not recorded"}</p>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 p-4">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Assessment data</p>
+                        <p className="mt-2 font-semibold text-slate-900">Source date: {formatRecordDate(selectedRisk.data_date)}</p>
+                        <p className="mt-1 text-sm text-slate-600">
+                          Confidence: {selectedRisk.confidence_level ?? "Not recorded"} · Exposure reference: {formatRecordDate(selectedExposure.reference_date)}
+                        </p>
+                      </div>
+                    </div>
+
+                    <details className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                      <summary className="cursor-pointer font-semibold text-slate-800">
+                        View evidence, methodology, and limitations
+                      </summary>
+                      <div className="mt-4 grid gap-4 text-sm text-slate-700 md:grid-cols-2">
+                        <div>
+                          <p className="font-bold text-slate-900">Evidence and sources</p>
+                          <ul className="mt-2 list-disc space-y-1 pl-5">
+                            {asList(selectedRisk.evidence).map((item) => <li key={item}>{item}</li>)}
+                            <li>Exposure source: {selectedExposure.source}</li>
+                            <li>Capacity source: {latestCapacity.source}</li>
+                            {hazard?.source ? <li>Hazard source: {hazard.source}</li> : null}
+                          </ul>
+                        </div>
+                        <div>
+                          <p className="font-bold text-slate-900">Limitations</p>
+                          {assessmentLimitations.length ? (
+                            <ul className="mt-2 list-disc space-y-1 pl-5">
+                              {assessmentLimitations.map((item, index) => (
+                                <li key={`${index}:${item}`}>{item}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-2">No limitations were recorded.</p>
+                          )}
+                        </div>
+                      </div>
+                    </details>
+                  </>
                 )}
-                <details>
-                  <summary className="cursor-pointer py-3 font-semibold">
-                    Record a population-exposure estimate
-                  </summary>
-                  <p className="mb-3 text-sm text-slate-600">
-                    Use an authorized spatial result. Values remain estimates,
-                    with method, confidence and source recorded.
-                  </p>
-                  <form
-                    className="space-y-3"
-                    onSubmit={(e) =>
-                      submit(e, async (f) => {
-                        await post("/api/exposure", {
-                          barangayId,
-                          hazardId,
-                          source: f.get("source"),
-                          referenceDate: f.get("date"),
-                          population: Number(f.get("population")),
-                          households: Number(f.get("households")),
-                          [String(f.get("method"))]: Number(f.get("value")),
-                          limitations: [String(f.get("limitations"))],
-                        });
-                        await load();
-                      })
+
+                <div className="flex flex-wrap gap-3">
+                  <Button disabled={busy || offline} onClick={() => void run(load, "Latest stored assessment data loaded.")}>
+                    Refresh stored data
+                  </Button>
+                  {!selectedRisk && (
+                    <Button
+                      disabled={
+                        !reviewer ||
+                        busy ||
+                        offline ||
+                        stale ||
+                        !advisoryId ||
+                        advisory?.verification_status !== "VERIFIED" ||
+                        !selectedHazardId
+                      }
+                      onClick={() =>
+                        void run(
+                          generateAssessment,
+                          "Advisory-specific assessment generated from the latest stored barangay-hazard baseline.",
+                        )
+                      }
+                    >
+                      Generate Assessment from Verified Data
+                    </Button>
+                  )}
+                  <Button
+                    disabled={!reviewer || busy || offline || stale || !assessmentReady}
+                    onClick={() =>
+                      void run(
+                        generateCard,
+                        "Action card generated from the stored assessment, exposure, and capacity records.",
+                      )
                     }
                   >
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <Field
-                        label="Population baseline"
-                        name="population"
-                        type="number"
-                        min={1}
-                      />
-                      <Field
-                        label="Household baseline"
-                        name="households"
-                        type="number"
-                        min={0}
-                      />
-                    </div>
-                    <label className="block text-sm">
-                      Method
-                      <select className={inputClass} name="method">
-                        <option value="inhabitedAreaRatio">
-                          Inhabited-area ratio (0–1, low confidence)
-                        </option>
-                        <option value="residentialBuildingRatio">
-                          Residential-building ratio (0–1)
-                        </option>
-                        <option value="populationGridIntersected">
-                          Population grid intersection (persons)
-                        </option>
-                      </select>
-                    </label>
-                    <Field
-                      label="Calculated spatial input"
-                      name="value"
-                      type="number"
-                      min={0}
-                      step="any"
-                    />
-                    <Field label="Source / spatial dataset" name="source" />
-                    <Field label="Reference date" name="date" type="date" />
-                    <Field label="Method limitations" name="limitations" />
-                    <Button
-                      type="submit"
-                      disabled={!reviewer || busy || offline}
-                    >
-                      Save exposure estimate
-                    </Button>
-                  </form>
-                </details>
-                <p className="text-sm text-slate-600">
-                  Recorded capacity:{" "}
-                  {capacityRecords
-                    .map(
-                      (c: Row) =>
-                        `${c.evacuation_capacity + c.temporary_shelter_capacity} persons; validated ${c.validation_date ?? "not yet"}; ${c.source}`,
-                    )
-                    .join(" · ") || "No validated capacity record."}
+                    Generate LGU Action Card
+                  </Button>
+                </div>
+
+                <p className="text-xs leading-relaxed text-slate-500">
+                  AGAP retrieves these values from the database for the selected barangay and advisory. Users review the evidence and result instead of reentering stored assessment data.
                 </p>
-                {!hasValidatedCapacity ? (
-                  <p className="text-sm font-medium text-amber-700" role="status">
-                    Record and validate preparedness capacity before generating an LGU action card.
-                  </p>
-                ) : null}
-                <Button
-                  disabled={!reviewer || busy || offline || stale || !hasValidatedCapacity}
-                  onClick={() =>
-                    void run(
-                      generateCard,
-                      "Action card generated, cached, and actions registered for review.",
-                    )
-                  }
-                >
-                  Generate LGU Action Card
-                </Button>
               </Section>
               {card && (
                 <>
@@ -1261,6 +1685,7 @@ function ConnectedLguOutput({ card: c, stale }: { card: Row; stale: boolean }) {
         likelihood: str(w.riskInputs.likelihood),
         severity: str(w.riskInputs.severity),
         riskResult: str(w.riskResult),
+        riskCategory: str(c.situation.riskCategory),
         relativeVulnerability: w.relativeVulnerability ?? null,
         methodology: w.methodology
           ? `${w.methodology.name} · ${w.methodology.version} · ${w.methodology.source}`
@@ -1284,6 +1709,11 @@ function ConnectedLguOutput({ card: c, stale }: { card: Row; stale: boolean }) {
         criticalFacilityReadiness: p.criticalFacilities
           .map((f: Row) => `${f.name}: ${f.operationalStatus}`)
           .join("; "),
+        criticalFacilities: p.criticalFacilities.map((f: Row) => ({
+          name: f.name,
+          operationalStatus: str(f.operationalStatus),
+          capacity: str(f.capacity),
+        })),
         communicationCapability: str(p.communicationAccess),
       }}
       evidence={w.vulnerabilityEvidence ?? []}
@@ -1337,6 +1767,69 @@ function ConnectedPostOutput({ value }: { value: Row }) {
     />
   );
 }
+function renderAiInline(text: string): ReactNode[] {
+  return text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map((part, index) => {
+    const match = part.match(/^\*\*(.+)\*\*$/);
+    return match ? <strong key={index}>{match[1]}</strong> : <span key={index}>{part}</span>;
+  });
+}
+
+function ReadableAiBrief({ text }: { text: string }) {
+  const lines = text.replace(/\r\n/g, "\n").split("\n");
+  return (
+    <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/40 p-4 sm:p-5">
+      <div className="space-y-2 text-sm leading-relaxed text-slate-700">
+        {lines.map((rawLine, index) => {
+          const line = rawLine.trim();
+          if (!line) return <div key={index} className="h-1" aria-hidden="true" />;
+
+          const heading = line.match(/^#{1,4}\s+(.+)$/);
+          if (heading) {
+            return (
+              <h4 key={index} className="pt-2 text-base font-bold text-slate-950 first:pt-0">
+                {renderAiInline(heading[1])}
+              </h4>
+            );
+          }
+
+          const bullet = line.match(/^[-*]\s+(.+)$/);
+          if (bullet) {
+            return (
+              <div key={index} className="flex gap-2 pl-1">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-blue-600" aria-hidden="true" />
+                <p className="min-w-0">{renderAiInline(bullet[1])}</p>
+              </div>
+            );
+          }
+
+          const numbered = line.match(/^(\d+)\.\s+(.+)$/);
+          if (numbered) {
+            return (
+              <div key={index} className="flex gap-2 pl-1">
+                <span className="min-w-5 font-bold text-blue-700">{numbered[1]}.</span>
+                <p className="min-w-0">{renderAiInline(numbered[2])}</p>
+              </div>
+            );
+          }
+
+          return <p key={index}>{renderAiInline(line)}</p>;
+        })}
+      </div>
+    </div>
+  );
+}
+
+function friendlyOperationalMethod(value: unknown) {
+  if (!value) return "Not recorded";
+  const raw = String(value);
+  const labels: Record<string, string> = {
+    INHABITED_AREA_PROPORTIONAL_FALLBACK: "Inhabited area proportion estimate",
+    POPULATION_GRID_INTERSECTION: "Population grid intersection",
+    RESIDENTIAL_BUILDING_ESTIMATE: "Residential building estimate",
+  };
+  return labels[raw] ?? raw.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function PreparednessBrief({ card: c }: { card: Row }) {
   const a = c.situation.currentVerifiedAdvisory;
   const [aiBrief, setAiBrief] = useState("");
@@ -1380,7 +1873,9 @@ function PreparednessBrief({ card: c }: { card: Row }) {
       const result = await response.json();
       if (!response.ok) throw new Error(result.error?.message ?? "AI briefing unavailable.");
       setAiBrief(result.data?.text ?? result.data?.content?.content ?? "");
-      if (result.data?.fallback) setAiError("Gemini wording is unavailable. This brief uses the persisted verified data and approved actions.");
+      if (result.data?.fallback) {
+        setAiError(result.data?.fallbackMessage ?? "Gemini wording is unavailable. This brief uses persisted verified data and approved actions.");
+      }
     } catch (error) {
       setAiError(error instanceof Error ? error.message : "AI briefing unavailable.");
     } finally {
@@ -1433,7 +1928,7 @@ function PreparednessBrief({ card: c }: { card: Row }) {
               <p className="text-xs font-bold uppercase tracking-wider text-slate-500">Potential exposure</p>
               <p className="mt-2 font-semibold">{display(e.estimatedPopulation)} persons / {display(e.estimatedHouseholds)} households</p>
               <p className="mt-1 text-slate-600">Confidence: {display(e.confidenceLevel)}</p>
-              <p className="text-slate-600">Method: {display(e.estimationMethod)}</p>
+              <p className="text-slate-600">Method: {friendlyOperationalMethod(e.estimationMethod)}</p>
             </div>
           </div>
         </section>
@@ -1491,7 +1986,7 @@ function PreparednessBrief({ card: c }: { card: Row }) {
             </Button>
           </div>
           {aiError ? <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">{aiError}</p> : null}
-          {aiBrief ? <p className="mt-3 whitespace-pre-wrap rounded-xl border border-blue-200 bg-blue-50/50 p-4 leading-relaxed text-slate-800">{aiBrief}</p> : null}
+          {aiBrief ? <ReadableAiBrief text={aiBrief} /> : null}
         </section>
 
         <p className="border-l-4 border-amber-400 bg-amber-50 p-4 font-semibold leading-relaxed text-amber-950">

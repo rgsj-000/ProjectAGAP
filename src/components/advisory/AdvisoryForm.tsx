@@ -4,7 +4,7 @@ import React, { FormEvent, useMemo, useRef, useState } from "react";
 import { useLanguage } from "@/context/LanguageContext";
 import HelpTooltip from "@/components/ui/HelpTooltip";
 import { getHelpContent, type HelpContentDefinition } from "@/lib/help-content";
-import { AlertCircle, FileText, Image as ImageIcon, Plus, ShieldCheck, Trash2, UploadCloud } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileText, Image as ImageIcon, LoaderCircle, Plus, ShieldCheck, Sparkles, Trash2, UploadCloud } from "lucide-react";
 
 export interface AdvisoryFormValues {
   title: string;
@@ -12,6 +12,7 @@ export interface AdvisoryFormValues {
   issuedTime: string;
   bulletinNumber: string;
   validity: string;
+  coverageLevel: "PROVINCE" | "CITY_MUNICIPALITY" | "BARANGAY" | "SPECIFIC_AREA";
   affectedLocations: string;
   warningInformation: string;
   sourceUrl: string;
@@ -32,6 +33,7 @@ const DEFAULT_VALUES: AdvisoryFormValues = {
   issuedTime: "",
   bulletinNumber: "",
   validity: "",
+  coverageLevel: "SPECIFIC_AREA",
   affectedLocations: "",
   warningInformation: "",
   sourceUrl: "",
@@ -94,6 +96,11 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState("");
   const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractionError, setExtractionError] = useState("");
+  const [extractionWarnings, setExtractionWarnings] = useState<string[]>([]);
+  const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [extractedFieldCount, setExtractedFieldCount] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const copy = useMemo(
@@ -103,10 +110,10 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             eyebrow: "Official advisory input",
             title: "Create or Update Advisory",
             description:
-              "Record only verified information issued by PAGASA, DOST, Lucena CDRRMO, or another authorized source.",
+              "Enter information exactly as stated by PAGASA, DOST, Lucena CDRRMO, or another authorized source. An authorized reviewer verifies the advisory after submission.",
             verificationTitle: "Before saving",
             verificationBody:
-              "Use only official source information. Check the source, reference, time, validity, affected locations, and verification status.",
+              "Use only official source information. Review the AI-extracted fields, correct any errors, then submit the advisory for authorized verification.",
             titleLabel: "Advisory title",
             titlePlaceholder: "e.g. Severe Rainfall Advisory",
             sourceLabel: "Issuing source",
@@ -117,7 +124,12 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             bulletinPlaceholder: "e.g. Bulletin #4",
             validityLabel: "Validity / effective period",
             validityPlaceholder: "e.g. Valid until 2:00 PM, 9 Sep 2026",
-            affectedLocationsLabel: "Affected locations",
+            coverageLevelLabel: "Source geographic coverage",
+            coverageProvince: "Province",
+            coverageCity: "City / Municipality",
+            coverageBarangay: "Barangay",
+            coverageSpecific: "Specific area",
+            affectedLocationsLabel: "Locations named by the source",
             affectedLocationsPlaceholder:
               "Enter only locations explicitly identified by the issuing source.",
             warningInformationLabel: "Warning information",
@@ -131,10 +143,10 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             precautionPlaceholder: "Enter one verified directive or precaution",
             addPrecaution: "Add directive",
             cancel: "Cancel",
-            save: "Save advisory",
-            saving: "Saving...",
+            save: "Submit for verification",
+            saving: "Submitting...",
             localSuccess:
-              "Advisory information is ready for authorized review. It is not treated as verified until the required review is completed.",
+              "Advisory submitted for authorized review. It remains FOR REVIEW until an Admin or LGU Reviewer verifies it.",
             required: "This field is required.",
             invalidDateRange: "Validity must be after the issued / updated time.",
             invalidUrl: "Enter a valid http:// or https:// source link.",
@@ -147,18 +159,26 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             dropFile: "Drop the file here",
             replaceFile: "Replace file",
             removeFile: "Remove file",
-            fileReady: "Ready to upload when the advisory is saved",
+            fileReady: "Ready to attach when the advisory is submitted",
             fileTooLarge: "File is larger than the 6 MB limit.",
             fileTypeInvalid: "Use a PDF, PNG, JPG, or JPEG file.",
+            extracting: "AI is reading the advisory and preparing the form…",
+            extractionReady: "AI extraction complete",
+            extractionReadyBody:
+              "Review every extracted field before saving. Missing or uncertain information still requires human validation.",
+            extractedFieldsLabel: "fields extracted",
+            missingLabel: "Needs validation",
+            extractionFailed:
+              "AI extraction could not complete. You can still fill the form manually.",
           }
         : {
             eyebrow: "Official advisory input",
             title: "Gumawa o Mag-update ng Babala",
             description:
-              "Itala lamang ang beripikadong impormasyong inilabas ng PAGASA, DOST, Lucena CDRRMO, o ibang awtorisadong ahensya.",
+              "Ilagay ang impormasyong eksaktong nakasaad sa PAGASA, DOST, Lucena CDRRMO, o ibang awtorisadong source. Ang final verification ay gagawin ng authorized reviewer pagkatapos isumite.",
             verificationTitle: "Bago i-save",
             verificationBody:
-              "Gamitin lamang ang official source information. Suriin ang source, reference, oras, validity, affected locations, at verification status.",
+              "Gamitin lamang ang official source information. Suriin at itama ang AI-extracted fields bago isumite para sa authorized verification.",
             titleLabel: "Pamagat ng babala",
             titlePlaceholder: "hal. Babala sa Malakas na Ulan",
             sourceLabel: "Ahensyang naglabas",
@@ -169,7 +189,12 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             bulletinPlaceholder: "hal. Bulletin #4",
             validityLabel: "Validity / panahon ng bisa",
             validityPlaceholder: "hal. May bisa hanggang 2:00 PM, 9 Sep 2026",
-            affectedLocationsLabel: "Mga apektadong lugar",
+            coverageLevelLabel: "Saklaw na heograpiko ng source",
+            coverageProvince: "Probinsya",
+            coverageCity: "Lungsod / Munisipalidad",
+            coverageBarangay: "Barangay",
+            coverageSpecific: "Tiyak na lugar",
+            affectedLocationsLabel: "Mga lugar na tahasang binanggit ng source",
             affectedLocationsPlaceholder:
               "Ilagay lamang ang mga lugar na tahasang tinukoy ng ahensyang naglabas.",
             warningInformationLabel: "Impormasyon ng warning",
@@ -183,10 +208,10 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             precautionPlaceholder: "Maglagay ng isang beripikadong tagubilin",
             addPrecaution: "Magdagdag ng tagubilin",
             cancel: "Kanselahin",
-            save: "I-save ang babala",
-            saving: "Sine-save...",
+            save: "Isumite para sa verification",
+            saving: "Isinusumite...",
             localSuccess:
-              "Handa na ang advisory information para sa authorized review. Hindi ito itinuturing na verified hangga't hindi tapos ang required review.",
+              "Naisumite ang advisory para sa authorized review. Mananatili itong FOR REVIEW hanggang ma-verify ng Admin o LGU Reviewer.",
             required: "Kinakailangan ang field na ito.",
             invalidDateRange: "Dapat ay mas huli ang validity kaysa sa oras ng paglabas / update.",
             invalidUrl: "Maglagay ng valid na http:// o https:// source link.",
@@ -199,9 +224,17 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             dropFile: "I-drop ang file dito",
             replaceFile: "Palitan ang file",
             removeFile: "Alisin ang file",
-            fileReady: "Handa nang i-upload kapag sine-save ang advisory",
+            fileReady: "Handa nang i-attach kapag isinumite ang advisory",
             fileTooLarge: "Lumampas ang file sa 6 MB limit.",
             fileTypeInvalid: "Gumamit ng PDF, PNG, JPG, o JPEG file.",
+            extracting: "Binabasa ng AI ang advisory at inihahanda ang form…",
+            extractionReady: "Tapos na ang AI extraction",
+            extractionReadyBody:
+              "Suriin ang bawat extracted field bago i-save. Ang kulang o hindi tiyak na impormasyon ay kailangan pa ring beripikahin ng tao.",
+            extractedFieldsLabel: "fields na nakuha",
+            missingLabel: "Kailangang beripikahin",
+            extractionFailed:
+              "Hindi natapos ang AI extraction. Maaari mo pa ring punan nang mano-mano ang form.",
           },
     [language]
   );
@@ -218,11 +251,84 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
   const clearSourceFile = () => {
     setSourceFile(null);
     setFileError("");
+    setExtractionError("");
+    setExtractionWarnings([]);
+    setMissingFields([]);
+    setExtractedFieldCount(0);
     setLocalSuccess(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
     onFileChange?.(null);
+  };
+
+  const extractSourceFile = async (file: File) => {
+    setIsExtracting(true);
+    setExtractionError("");
+    setExtractionWarnings([]);
+    setMissingFields([]);
+    setExtractedFieldCount(0);
+    setLocalSuccess(false);
+
+    try {
+      const form = new FormData();
+      form.set("file", file);
+      const response = await fetch("/api/advisories/extract", {
+        method: "POST",
+        body: form,
+      });
+      const body = await response.json();
+      if (!response.ok || !body.success) {
+        throw new Error(body.error?.message ?? copy.extractionFailed);
+      }
+
+      const result = body.data as {
+        fields: {
+          title: string | null;
+          source: string | null;
+          issuedTime: string | null;
+          bulletinNumber: string | null;
+          validity: string | null;
+          coverageLevel: "PROVINCE" | "CITY_MUNICIPALITY" | "BARANGAY" | "SPECIFIC_AREA" | null;
+          affectedLocations: string[];
+          warningInformation: string | null;
+          sourceUrl: string | null;
+          message: string | null;
+          precautions: string[];
+        };
+        extractedFields: string[];
+        missingFields: string[];
+        warnings: string[];
+      };
+
+      setValues((current) => ({
+        ...current,
+        title: result.fields.title ?? "",
+        source: result.fields.source ?? "",
+        issuedTime: result.fields.issuedTime ?? "",
+        bulletinNumber: result.fields.bulletinNumber ?? "",
+        validity: result.fields.validity ?? "",
+        coverageLevel: result.fields.coverageLevel ?? current.coverageLevel,
+        affectedLocations: result.fields.affectedLocations.join(", "),
+        warningInformation: result.fields.warningInformation ?? "",
+        sourceUrl: result.fields.sourceUrl ?? "",
+        message: result.fields.message ?? "",
+        precautions:
+          result.fields.precautions.length > 0
+            ? result.fields.precautions
+            : [""],
+      }));
+      setErrors({});
+      setExtractionWarnings(result.warnings);
+      setMissingFields(result.missingFields);
+      setExtractedFieldCount(result.extractedFields.length);
+    } catch (error) {
+      setExtractionError(
+        error instanceof Error ? error.message : copy.extractionFailed,
+      );
+    } finally {
+      setIsExtracting(false);
+    }
   };
 
   const selectSourceFile = (file: File | null) => {
@@ -251,8 +357,10 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
 
     setSourceFile(file);
     setFileError("");
+    setExtractionError("");
     setLocalSuccess(false);
     onFileChange?.(file);
+    void extractSourceFile(file);
   };
 
   const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -350,6 +458,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
       issuedTime: values.issuedTime.trim(),
       bulletinNumber: values.bulletinNumber.trim(),
       validity: values.validity.trim(),
+      coverageLevel: values.coverageLevel,
       affectedLocations: values.affectedLocations.trim(),
       warningInformation: values.warningInformation.trim(),
       sourceUrl: values.sourceUrl.trim(),
@@ -507,6 +616,75 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
             {fileError}
           </p>
         ) : null}
+
+        {sourceFile && isExtracting && (
+          <div
+            role="status"
+            className="mt-4 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 text-blue-900"
+          >
+            <LoaderCircle
+              className="mt-0.5 h-4 w-4 shrink-0 animate-spin"
+              aria-hidden="true"
+            />
+            <div>
+              <p className="text-xs font-bold">{copy.extracting}</p>
+              <p className="mt-1 text-[11px] leading-5 text-blue-800">
+                {language === "en"
+                  ? "The form remains editable. AI only extracts information supported by the uploaded source."
+                  : "Mananatiling editable ang form. Ang AI ay kukuha lamang ng impormasyong suportado ng uploaded source."}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {sourceFile && !isExtracting && extractedFieldCount > 0 && (
+          <div
+            role="status"
+            className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4"
+          >
+            <div className="flex items-start gap-3">
+              <CheckCircle2
+                className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700"
+                aria-hidden="true"
+              />
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-emerald-900">
+                  {copy.extractionReady} · {extractedFieldCount}{" "}
+                  {copy.extractedFieldsLabel}
+                </p>
+                <p className="mt-1 text-[11px] leading-5 text-emerald-800">
+                  {copy.extractionReadyBody}
+                </p>
+              </div>
+            </div>
+
+            {missingFields.length > 0 && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-white/70 p-3">
+                <p className="flex items-center gap-1.5 text-[11px] font-bold text-amber-900">
+                  <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
+                  {copy.missingLabel}: {missingFields.join(", ")}
+                </p>
+              </div>
+            )}
+
+            {extractionWarnings.length > 0 && (
+              <ul className="mt-3 space-y-1 text-[11px] leading-5 text-slate-700">
+                {extractionWarnings.map((warning, index) => (
+                  <li key={index}>• {warning}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {sourceFile && !isExtracting && extractionError && (
+          <p
+            role="alert"
+            className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800"
+          >
+            {extractionError}
+          </p>
+        )}
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
@@ -579,6 +757,26 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
               aria-invalid={Boolean(errors.validity)}
             />
           </Field>
+
+          <Field label={copy.coverageLevelLabel}>
+            <select
+              value={values.coverageLevel}
+              onChange={(event) =>
+                updateField(
+                  "coverageLevel",
+                  event.target.value as AdvisoryFormValues["coverageLevel"],
+                )
+              }
+              className={inputClass(false)}
+            >
+              <option value="PROVINCE">{copy.coverageProvince}</option>
+              <option value="CITY_MUNICIPALITY">{copy.coverageCity}</option>
+              <option value="BARANGAY">{copy.coverageBarangay}</option>
+              <option value="SPECIFIC_AREA">{copy.coverageSpecific}</option>
+            </select>
+          </Field>
+
+          <div className="hidden sm:block" />
 
           <Field
             label={copy.affectedLocationsLabel}
@@ -708,7 +906,7 @@ export const AdvisoryForm: React.FC<AdvisoryFormProps> = ({
         )}
         <button
           type="submit"
-          disabled={isSaving}
+          disabled={isSaving || isExtracting}
           className="min-h-11 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isSaving ? copy.saving : copy.save}

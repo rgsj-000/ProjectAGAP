@@ -1,2 +1,103 @@
-import { householdRequest } from "@/lib/server/validation"; import { fail, ok, AppError } from "@/lib/server/errors"; import { createAdminClient } from "@/lib/server/supabase"; import { activeRules, activeVerifiedAdvisory, camelAdvisory } from "@/lib/server/repositories"; import { generateHouseholdCard } from "@/lib/domain/actionCards";
-export async function POST(request:Request){try{const v=householdRequest.parse(await request.json());const db=createAdminClient();let barangay:string;let profile:Record<string,unknown>;let code:string|undefined;let language=v.language;if(v.mode==="code"){const{data,error}=await db.from("household_profiles").select("household_code,household_members,has_children,has_older_person,has_pwd_or_mobility_limitation,needs_essential_medicine,has_pets,housing_characteristics,communication_methods,barangays!inner(barangay_name)").eq("household_code",v.householdCode.toUpperCase()).maybeSingle();if(error)throw error;if(!data)throw new AppError("RECORD_NOT_FOUND","Household code was not found.",404);const b:any=data.barangays;barangay=b.barangay_name;code=data.household_code;profile={householdSize:data.household_members,hasInfantOrChild:data.has_children,hasOlderPerson:data.has_older_person,hasPwdOrMobilityLimitation:data.has_pwd_or_mobility_limitation,hasEssentialMedicineNeed:data.needs_essential_medicine,hasPets:data.has_pets,housingCharacteristics:data.housing_characteristics,communicationMethods:data.communication_methods};}else{barangay=v.barangay;profile=v.mode==="quick-profile"?v:{genericBarangay:true};}const advisory=camelAdvisory(await activeVerifiedAdvisory(db,barangay));const rules=await activeRules(db,"HOUSEHOLD");const card=generateHouseholdCard({barangay,householdCode:code,profile,advisory,rules,language});await db.from("generated_outputs").insert({output_type:"HOUSEHOLD_ACTION_CARD",content:card,language,source_snapshot:{advisoryId:advisory.id,ruleIds:card.actions.map(a=>a.id)}});return ok(card,201)}catch(e){return fail(e)}}
+import { generateHouseholdCard } from "@/lib/domain/actionCards";
+import { fail, ok, AppError } from "@/lib/server/errors";
+import {
+  activeRules,
+  activeVerifiedAdvisory,
+  camelAdvisory,
+} from "@/lib/server/repositories";
+import { createPublicDataClient } from "@/lib/server/supabase";
+import { householdRequest } from "@/lib/server/validation";
+
+type HouseholdLookupRow = {
+  household_code: string;
+  barangay_name: string;
+  household_members: number | null;
+  has_children: boolean;
+  has_older_person: boolean;
+  has_pwd_or_mobility_limitation: boolean;
+  needs_essential_medicine: boolean;
+  has_pets: boolean;
+  housing_characteristics: unknown;
+  communication_methods: string[];
+};
+
+export async function POST(request: Request) {
+  try {
+    const v = householdRequest.parse(await request.json());
+    const db = createPublicDataClient();
+
+    let barangay: string;
+    let profile: Record<string, unknown>;
+    let code: string | undefined;
+    const language = v.language;
+
+    if (v.mode === "code") {
+      /*
+       * Exact-code lookup is implemented as a SECURITY DEFINER RPC that exposes
+       * only the minimum non-identifying preparedness fields. anon still has
+       * no direct SELECT permission on household_profiles.
+       */
+      const normalizedCode = v.householdCode.trim().toUpperCase();
+      const { data, error } = await db.rpc("lookup_household_profile", {
+        p_household_code: normalizedCode,
+      });
+
+      if (error) throw error;
+
+      const row = (Array.isArray(data) ? data[0] : data) as
+        | HouseholdLookupRow
+        | undefined;
+
+      if (!row) {
+        throw new AppError(
+          "RECORD_NOT_FOUND",
+          "Household code was not found.",
+          404,
+        );
+      }
+
+      barangay = row.barangay_name;
+      code = row.household_code;
+      profile = {
+        householdSize: row.household_members,
+        hasInfantOrChild: row.has_children,
+        hasOlderPerson: row.has_older_person,
+        hasPwdOrMobilityLimitation: row.has_pwd_or_mobility_limitation,
+        hasEssentialMedicineNeed: row.needs_essential_medicine,
+        hasPets: row.has_pets,
+        housingCharacteristics: row.housing_characteristics,
+        communicationMethods: row.communication_methods ?? [],
+      };
+    } else {
+      barangay = v.barangay;
+      profile =
+        v.mode === "quick-profile" ? v : { genericBarangay: true };
+    }
+
+    const advisory = camelAdvisory(
+      await activeVerifiedAdvisory(db, barangay),
+    );
+    const rules = await activeRules(db, "HOUSEHOLD");
+
+    if (!rules.length) {
+      throw new AppError(
+        "ACTION_RULE_MISSING",
+        "No approved household preparedness rules are available for the current advisory.",
+        503,
+      );
+    }
+
+    const card = generateHouseholdCard({
+      barangay,
+      householdCode: code,
+      profile,
+      advisory,
+      rules,
+      language,
+    });
+
+    return ok(card, 201);
+  } catch (e) {
+    return fail(e);
+  }
+}

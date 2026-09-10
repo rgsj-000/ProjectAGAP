@@ -10,9 +10,23 @@ import { cacheOfflinePack, readOfflinePack } from "@/lib/client/offlineQueue";
 import { generateHouseholdCard } from "@/lib/domain/actionCards";
 import { ConnectivityStatus } from "@/components/feedback/ConnectivityStatus";
 
+type PublicAdvisory = {
+  id: string;
+  sourceAgency: string;
+  advisoryType: string;
+  bulletinReference: string;
+  warningInformation: string;
+  issueTime: string;
+  validityEnd: string;
+  affectedAreas: string[];
+  sourceLink: string;
+  verificationStatus: "VERIFIED";
+};
+
 export function ConnectedHouseholdCard() {
   const { language } = useLanguage();
   const [barangays, setBarangays] = useState<string[]>([]);
+  const [currentAdvisories, setCurrentAdvisories] = useState<PublicAdvisory[]>([]);
   const [output, setOutput] = useState<HouseholdCardOutput | null>(null);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -29,13 +43,24 @@ export function ConnectedHouseholdCard() {
     window.addEventListener("offline", update);
     void (async () => {
       try {
-        const names = await api<string[]>("/api/public/preparedness");
+        const [names, advisories] = await Promise.all([
+          api<string[]>("/api/public/preparedness"),
+          api<PublicAdvisory[]>("/api/public/advisories"),
+        ]);
         setBarangays(names);
-        await cacheOfflinePack("public:barangays", names);
+        setCurrentAdvisories(advisories);
+        await Promise.all([
+          cacheOfflinePack("public:barangays", names),
+          cacheOfflinePack("public:advisories", advisories),
+        ]);
       } catch (e) {
-        const cached = await readOfflinePack<string[]>("public:barangays").catch(() => undefined);
-        if (cached) setBarangays(cached.data);
-        else
+        const [cachedBarangays, cachedAdvisories] = await Promise.all([
+          readOfflinePack<string[]>("public:barangays").catch(() => undefined),
+          readOfflinePack<PublicAdvisory[]>("public:advisories").catch(() => undefined),
+        ]);
+        if (cachedBarangays) setBarangays(cachedBarangays.data);
+        if (cachedAdvisories) setCurrentAdvisories(cachedAdvisories.data);
+        if (!cachedBarangays)
           setError(
             navigator.onLine
               ? "Household data is temporarily unavailable. Please try again later or contact your barangay."
@@ -150,14 +175,6 @@ export function ConnectedHouseholdCard() {
           className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
         >
           {error}
-        </p>
-      )}
-      {success && (
-        <p
-          role="status"
-          className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
-        >
-          {success}
         </p>
       )}
       <HouseholdActionCard

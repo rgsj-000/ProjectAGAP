@@ -8,6 +8,36 @@ const output = z.object({
   sourceFields: z.array(z.string()).max(50),
 });
 
+const GEMINI_TIMEOUT_MS = 60_000;
+
+function resolveGeminiModel() {
+  const configured = process.env.GEMINI_MODEL?.trim();
+  if (!configured || configured === "gemini-2.5-flash") return "gemini-3.6-flash";
+  return configured;
+}
+
+function failureMetadata(error: unknown) {
+  if (error instanceof Error && error.name === "AbortError") {
+    return { category: "timeout", stage: "request_timeout" };
+  }
+  if (error instanceof Error && error.message.startsWith("Gemini HTTP")) {
+    return { category: "provider_error", stage: "provider_http" };
+  }
+  if (error instanceof SyntaxError) {
+    return { category: "invalid_response", stage: "malformed_json" };
+  }
+  if (error instanceof z.ZodError) {
+    return { category: "invalid_response", stage: "schema_mismatch" };
+  }
+  if (error instanceof Error && error.message === "Gemini returned no text candidate") {
+    return { category: "invalid_response", stage: "missing_candidate" };
+  }
+  if (error instanceof Error && error.message === "Prohibited AI content detected.") {
+    return { category: "invalid_response", stage: "safety_rejection" };
+  }
+  return { category: "unavailable", stage: "transport_error" };
+}
+
 function parseJson(text: string) {
   const normalized = text
     .trim()
@@ -21,20 +51,24 @@ export async function explainWithGemini(input: {
   verifiedInput: Record<string, unknown>;
   language: "en" | "fil";
 }) {
+  const startedAt = Date.now();
   const key = process.env.GEMINI_API_KEY;
-  const model = process.env.GEMINI_MODEL ?? "gemini-3.6-flash";
+  const model = resolveGeminiModel();
 
   if (!key) {
+    const details = { reason: "unavailable", stage: "configuration", elapsedMs: Date.now() - startedAt };
+    console.error("AGAP Gemini request failed", { model, category: details.reason, stage: details.stage, elapsedMs: details.elapsedMs });
     throw new AppError(
       "GEMINI_UNAVAILABLE",
       "Gemini is not configured. Deterministic output remains available.",
       503,
+      details,
     );
   }
 
   const prompt = `You are Project AGAP's constrained wording assistant. You may only explain, simplify, translate, or summarize the supplied verified JSON. Never calculate or change risk, invent facts, issue warnings, evacuation orders/routes, safety declarations, relief allocations, or infrastructure decisions. Return JSON only: {"text":string,"warnings":string[],"sourceFields":string[]}. Task: ${input.task}. Language: ${input.language}. Verified input: ${JSON.stringify(input.verifiedInput)}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
 
   try {
     const response = await fetch(
@@ -53,13 +87,37 @@ export async function explainWithGemini(input: {
         cache: "no-store",
       },
     );
-    const body = await response.json().catch(() => null);
+    let body: any = null;
+    let bodyParseError: unknown;
+    try {
+      body = await response.json();
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") throw error;
+      bodyParseError = error;
+    }
 
     if (!response.ok) {
+      const providerStatus =
+        typeof body?.error?.status === "string" ? body.error.status : undefined;
+      const providerMessage =
+        typeof body?.error?.message === "string"
+          ? body.error.message.slice(0, 1200)
+          : undefined;
+
+      console.error("AGAP Gemini provider HTTP error", {
+        model,
+        status: response.status,
+        statusText: response.statusText,
+        providerStatus,
+        providerMessage,
+        elapsedMs: Date.now() - startedAt,
+      });
+
       throw new Error(
-        `Gemini HTTP ${response.status}${body?.error?.status ? ` (${body.error.status})` : ""}`,
+        `Gemini HTTP ${response.status}${providerStatus ? ` (${providerStatus})` : ""}`,
       );
     }
+    if (bodyParseError) throw bodyParseError;
 
     const text = body?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (typeof text !== "string" || !text.trim()) {
@@ -70,13 +128,14 @@ export async function explainWithGemini(input: {
     assertSafeAiWording(parsed.text);
     return parsed;
   } catch (error) {
-    const reason = error instanceof Error ? error.message : "Unknown Gemini failure";
-    console.error("AGAP Gemini request failed", { model, reason });
+    const { category, stage } = failureMetadata(error);
+    const elapsedMs = Date.now() - startedAt;
+    console.error("AGAP Gemini request failed", { model, category, stage, elapsedMs });
     throw new AppError(
       "GEMINI_UNAVAILABLE",
       "Gemini response failed validation. Use the deterministic template.",
       503,
-      reason,
+      { reason: category, stage, elapsedMs },
     );
   } finally {
     clearTimeout(timeout);

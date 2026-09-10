@@ -23,3 +23,6 @@ yarn-error.log*
 Thumbs.db
 .vercel
 .env*.local
+
+# Local isolated feature worktrees
+.worktrees/
