@@ -7,40 +7,25 @@ import { MobileBottomNav } from "./MobileNavigation";
 import { HelpDialog } from "./HelpDialog";
 import { AdvisoryModal } from "../advisory/AdvisoryModal";
 import { OperationalWorkspace } from "../modules/OperationalWorkspace";
-import { PublicHouseholdView } from "../public/PublicHouseholdView";
-import { useNavigation } from "@/context/NavigationContext";
 
 export const AppShell: React.FC = () => {
-  const { isPublicUser } = useNavigation();
-
-  if (isPublicUser) {
-    return <PublicHouseholdView showDemoSwitcher />;
-  }
-
   return (
-    <div className="min-h-screen bg-slate-50 flex text-slate-900 antialiased font-sans">
-      {/* 1. Desktop Left Sidebar (4 Clean Primary Items) */}
+    <div className="flex min-h-screen bg-slate-50 font-sans text-slate-900 antialiased">
       <AppSidebar />
 
-      {/* 2. Main Content Canvas */}
-      <div className="flex-1 flex flex-col min-w-0 pb-16 lg:pb-0">
+      <div className="flex min-w-0 flex-1 flex-col pb-16 lg:pb-0">
         <AppHeader />
         <main
           id="main-content"
           tabIndex={-1}
-          className="flex-1 px-4 sm:px-8 lg:px-12 py-6 sm:py-8 max-w-4xl w-full mx-auto outline-hidden"
+          className="mx-auto w-full max-w-4xl flex-1 px-4 py-6 outline-hidden sm:px-8 sm:py-8 lg:px-12"
         >
           <OperationalWorkspace />
         </main>
       </div>
 
-      {/* 3. Mobile Bottom Navigation (4 Direct Tabs) */}
       <MobileBottomNav />
-
-      {/* 4. Help & Emergency Modal */}
       <HelpDialog />
-
-      {/* 5. Official Advisory Modal */}
       <AdvisoryModal />
     </div>
   );
