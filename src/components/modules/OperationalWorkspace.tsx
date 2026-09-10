@@ -407,6 +407,101 @@ export function OperationalWorkspace() {
   async function loadActions(outputId: string) {
     setActions(await api<Row[]>(`/api/actions?outputId=${outputId}`));
   }
+
+  async function refreshPostImpact() {
+    if (!barangay?.barangay_name) return;
+    const result = await post<Row>("/api/post-impact/by-barangay", {
+      barangay: barangay.barangay_name,
+    });
+    setPostImpact(result);
+    if (result?.card?.outputId) await loadActions(result.card.outputId);
+    if (data?.userId) {
+      await cacheOfflinePack(
+        `post:${data.userId}:${barangayId}`,
+        result,
+      );
+    }
+  }
+
+  async function openPostImpactValidation() {
+    if (!postImpact?.review?.report_ids?.length) {
+      setMessage("No linked reports are available for validation.");
+      return;
+    }
+    const latestReports = await api<Row[]>(
+      `/api/damage-reports?barangayId=${barangayId}`,
+    );
+    setReports(latestReports);
+    const linkedIds = new Set(postImpact.review.report_ids as string[]);
+    const pending = latestReports.find(
+      (report) =>
+        linkedIds.has(report.id) && report.verification_status !== "VERIFIED",
+    );
+    if (!pending) {
+      setMessage("All reports linked to this post-impact review are already verified.");
+      return;
+    }
+    setReviewReason("");
+    setReviewDialog({ kind: "verify", report: pending });
+  }
+
+  async function updatePostImpactReview(
+    action: "REQUEST_UPDATE" | "RECORD_DECISION",
+  ) {
+    if (!postImpact?.review?.id) return;
+    const reason = window.prompt(
+      action === "REQUEST_UPDATE"
+        ? "Reason or information requested from the reporting unit:"
+        : "Record the LGU decision and basis:",
+    )?.trim();
+    if (!reason) return;
+    if (reason.length < 10) {
+      throw new Error("Enter at least 10 characters for the reason or decision basis.");
+    }
+    await api(`/api/post-impact/reviews/${postImpact.review.id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ action, reason }),
+    });
+    await refreshPostImpact();
+  }
+
+  async function updatePostImpactAction(
+    actionId: string,
+    status: "ASSIGNED" | "IN_PROGRESS",
+  ) {
+    const action = actions.find((item) => item.id === actionId);
+    if (!action) throw new Error("The saved operational action could not be found.");
+
+    const responsibleUnit =
+      status === "ASSIGNED"
+        ? window.prompt(
+            "Responsible office or unit:",
+            action.responsible_unit ?? "",
+          )?.trim()
+        : action.responsible_unit;
+
+    if (!responsibleUnit) return;
+
+    const reason = window.prompt(
+      status === "ASSIGNED"
+        ? "Assignment reason or instruction:"
+        : "Progress update / basis:",
+    )?.trim();
+    if (!reason) return;
+    if (reason.length < 10) {
+      throw new Error("Enter at least 10 characters for the action reason.");
+    }
+
+    await api(`/api/actions/${actionId}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        status,
+        reason,
+        responsibleUnit,
+      }),
+    });
+    await loadActions(action.generated_output_id);
+  }
   async function generateAssessment() {
     if (!barangayId || !advisoryId || !selectedHazardId) {
       throw new Error("Select a barangay, verified advisory, and hazard first.");
@@ -448,6 +543,11 @@ export function OperationalWorkspace() {
       if (dialog.kind === "verify") {
         await post(`/api/damage-reports/${dialog.report.id}/verify`, { reason });
         await loadReports();
+        if (
+          postImpact?.review?.report_ids?.includes(dialog.report.id)
+        ) {
+          await refreshPostImpact();
+        }
       } else {
         await post(`/api/conflicts/${dialog.conflict.id}/resolve`, {
           resolution: "KEEP_SERVER",
@@ -1507,7 +1607,47 @@ export function OperationalWorkspace() {
               Open saved post-impact card
             </Button>
           </Section>
-          {postImpact && <ConnectedPostOutput value={postImpact} />}
+          {postImpact && (
+            <ConnectedPostOutput
+              value={postImpact}
+              operationalActions={actions}
+              onValidateImpacts={() =>
+                void run(
+                  openPostImpactValidation,
+                  "Validation workflow opened.",
+                  "Checking linked reports…",
+                )
+              }
+              onAssignAction={(actionId) =>
+                void run(
+                  () => updatePostImpactAction(actionId, "ASSIGNED"),
+                  "Action assignment recorded.",
+                  "Recording assignment…",
+                )
+              }
+              onUpdateActionStatus={(actionId) =>
+                void run(
+                  () => updatePostImpactAction(actionId, "IN_PROGRESS"),
+                  "Action status updated.",
+                  "Updating action…",
+                )
+              }
+              onRequestUpdate={() =>
+                void run(
+                  () => updatePostImpactReview("REQUEST_UPDATE"),
+                  "Update request recorded.",
+                  "Recording update request…",
+                )
+              }
+              onRecordDecision={() =>
+                void run(
+                  () => updatePostImpactReview("RECORD_DECISION"),
+                  "LGU decision recorded.",
+                  "Recording decision…",
+                )
+              }
+            />
+          )}
         </>
       )}
       {actions.length > 0 && (
@@ -1759,8 +1899,79 @@ function ConnectedLguOutput({ card: c, stale }: { card: Row; stale: boolean }) {
     />
   );
 }
-function ConnectedPostOutput({ value }: { value: Row }) {
-  const { review: r, card: c } = value;
+function formatPostImpactVulnerableGroups(value: unknown) {
+  if (!value || typeof value !== "object") return "None reported";
+  const groups = value as Record<string, unknown>;
+  const entries = [
+    ["Children", groups.children ?? groups.children_under5],
+    ["Older Persons", groups.older_persons ?? groups.olderPersons ?? groups.older_persons_60plus],
+    ["Persons with Disabilities", groups.persons_with_disabilities ?? groups.pwd ?? groups.pwd_count],
+  ]
+    .map(([label, count]) => [label, Number(count ?? 0)] as const)
+    .filter(([, count]) => Number.isFinite(count) && count > 0);
+  return entries.length
+    ? entries.map(([label, count]) => `${label}: ${count}`).join(" · ")
+    : "None reported";
+}
+
+function formatPostImpactNeeds(value: unknown) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "None recorded";
+  const labels: Record<string, string> = {
+    food: "Food",
+    water: "Water",
+    shelter: "Shelter",
+    medicine: "Medicine",
+    rescue: "Rescue",
+    restoration: "Service Restoration",
+  };
+  return raw
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .map((item) => labels[item.toLowerCase()] ?? item)
+    .join(" · ");
+}
+
+function formatPostImpactMethod(value: unknown) {
+  if (!value) return null;
+  const labels: Record<string, string> = {
+    INHABITED_AREA_PROPORTION_FALLBACK: "Inhabited area proportion estimate",
+    INHABITED_AREA_PROPORTIONAL_FALLBACK: "Inhabited area proportion estimate",
+    POPULATION_GRID_INTERSECTION: "Population grid intersection",
+    RESIDENTIAL_BUILDING_ESTIMATE: "Residential building estimate",
+  };
+  const raw = String(value);
+  return (
+    labels[raw] ??
+    raw
+      .replaceAll("_", " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (letter) => letter.toUpperCase())
+  );
+}
+
+function ConnectedPostOutput({
+  value,
+  operationalActions,
+  onValidateImpacts,
+  onAssignAction,
+  onUpdateActionStatus,
+  onRequestUpdate,
+  onRecordDecision,
+}: {
+  value: Row;
+  operationalActions: Row[];
+  onValidateImpacts: () => void;
+  onAssignAction: (actionId: string) => void;
+  onUpdateActionStatus: (actionId: string) => void;
+  onRequestUpdate: () => void;
+  onRecordDecision: () => void;
+}) {
+  const { review: r, card: c, preEventComparison } = value;
+  const savedActionForRule = (ruleId: string) =>
+    operationalActions.find((item) => item.action_rule_id === ruleId);
+
   return (
     <PostImpactActionCard
       barangayName={c.barangay}
@@ -1771,29 +1982,57 @@ function ConnectedPostOutput({ value }: { value: Row }) {
         awaitingValidationPersons: str(c.populationAwaitingValidation),
         reportedAffectedHouseholds: str(r.reported_households),
         validatedAffectedHouseholds: str(r.validated_households),
-        vulnerableGroupsReported: str(r.vulnerable_groups),
+        vulnerableGroupsReported: formatPostImpactVulnerableGroups(r.vulnerable_groups),
         damageSummary: r.damage_summary,
         criticalFacilityCondition: r.facility_condition,
         serviceDisruption: r.service_disruption,
         accessibilityConstraints: r.accessibility_constraints,
-        urgentUnmetNeeds: r.urgent_unmet_needs,
+        urgentUnmetNeeds: formatPostImpactNeeds(r.urgent_unmet_needs),
         verificationState: r.validation_status,
         lastValidatedAt: r.updated_at,
       }}
-      actions={c.actions.map((a: Row) => ({
-        id: a.actionRuleId,
-        phase: a.phase,
-        action: a.action,
-        whyItApplies: a.whyItApplies,
-        evidence: str(a.evidence),
-        sourceRule: `${a.actionRuleId} · ${a.source}`,
-        responsibleUnit: a.responsibleUnit,
-        confirmationRequired: a.requiresLguConfirmation,
-        status: a.status,
-      }))}
+      preEventComparison={
+        preEventComparison
+          ? {
+              estimatedPotentiallyExposedPopulation: str(
+                preEventComparison.estimatedPotentiallyExposedPopulation,
+              ),
+              estimateMethod: formatPostImpactMethod(
+                preEventComparison.estimateMethod,
+              ),
+              estimateConfidence: str(preEventComparison.estimateConfidence),
+            }
+          : null
+      }
+      dataGaps={
+        r.validation_status === "VERIFIED" &&
+        Number(c.populationAwaitingValidation ?? 0) === 0
+          ? []
+          : ["One or more reported impacts still require authorized validation."]
+      }
+      actions={c.actions.map((a: Row) => {
+        const saved = savedActionForRule(a.actionRuleId);
+        return {
+          id: saved?.id ?? a.actionRuleId,
+          phase: a.phase,
+          action: a.action,
+          whyItApplies: a.whyItApplies,
+          evidence: str(a.evidence),
+          sourceRule: `${a.actionRuleId} · ${a.source}`,
+          responsibleUnit: saved?.responsible_unit ?? a.responsibleUnit,
+          confirmationRequired: a.requiresLguConfirmation,
+          status: saved?.status ?? a.status,
+        };
+      })}
+      onValidateImpacts={onValidateImpacts}
+      onAssignAction={onAssignAction}
+      onUpdateActionStatus={(actionId) => onUpdateActionStatus(actionId)}
+      onRequestUpdate={onRequestUpdate}
+      onRecordDecision={onRecordDecision}
     />
   );
 }
+
 function renderAiInline(text: string): ReactNode[] {
   return text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean).map((part, index) => {
     const match = part.match(/^\*\*(.+)\*\*$/);
