@@ -2,6 +2,7 @@
 import {
   useCallback,
   useEffect,
+  useRef,
   useState,
   type FormEvent,
   type ReactNode,
@@ -131,6 +132,7 @@ export function OperationalWorkspace() {
   const [auditRows, setAuditRows] = useState<Row[]>([]);
   const [offline, setOffline] = useState(false);
   const [showAdvisory, setShowAdvisory] = useState(false);
+  const advisoryEditorRef = useRef<HTMLDivElement | null>(null);
   const [workingLabel, setWorkingLabel] = useState("Working…");
   const [editingAdvisoryId, setEditingAdvisoryId] = useState("");
   const [reviewAdvisoryId, setReviewAdvisoryId] = useState("");
@@ -141,6 +143,17 @@ export function OperationalWorkspace() {
     | { kind: "conflict"; conflict: Row }
     | null
   >(null);
+  useEffect(() => {
+    if (!showAdvisory) return;
+    const frame = window.requestAnimationFrame(() => {
+      advisoryEditorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [showAdvisory, editingAdvisoryId]);
+
   const reviewer = data?.role === "admin" || data?.role === "lgu_reviewer";
   const barangay = data?.barangays.find((b: Row) => b.id === barangayId);
   const advisory = data?.advisories.find((a: Row) => a.id === advisoryId);
@@ -848,7 +861,7 @@ export function OperationalWorkspace() {
                 }
                 onClick={() => {
                   setEditingAdvisoryId("");
-                  setShowAdvisory(!showAdvisory);
+                  setShowAdvisory(true);
                 }}
               >
                 Create advisory
@@ -981,7 +994,11 @@ export function OperationalWorkspace() {
               </div>
 
               {showAdvisory && (
-                <div className="border-t border-slate-200 pt-5">
+                <div
+                  ref={advisoryEditorRef}
+                  id="advisory-editor"
+                  className="scroll-mt-24 border-t border-slate-200 pt-5"
+                >
                   <AdvisoryForm
                     key={editingAdvisoryId || "create-advisory"}
                     initialValues={advisoryInitialValues}
