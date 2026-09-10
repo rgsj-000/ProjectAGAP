@@ -1,27 +1,86 @@
 import type { AdvisoryFormValues } from "@/components/advisory/AdvisoryForm";
 import type { HouseholdCardOutput, HouseholdQuickProfile } from "@/components/household/HouseholdActionCard";
 
+type ApiErrorPayload = {
+  code?: string;
+  message?: string;
+  details?: unknown;
+};
+
+type ApiEnvelope<T> = {
+  success?: boolean;
+  data?: T;
+  error?: ApiErrorPayload;
+};
+
+export class ApiClientError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly status: number,
+    public readonly details?: unknown,
+  ) {
+    super(message);
+    this.name = "ApiClientError";
+  }
+}
+
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 30000);
+  const timeout = globalThis.setTimeout(() => controller.abort(), 30000);
+
   try {
-    const response = await fetch(url, {
-      ...init,
-      signal: init?.signal ?? controller.signal,
-      headers: { "content-type": "application/json", ...init?.headers },
-    });
-    const body = await response.json().catch(() => null);
-    if (!response.ok || !body?.success) {
-      throw new Error(body?.error?.message ?? "Project AGAP request failed.");
+    let response: Response;
+
+    try {
+      response = await fetch(url, {
+        ...init,
+        signal: init?.signal ?? controller.signal,
+        headers: {
+          "content-type": "application/json",
+          ...init?.headers,
+        },
+      });
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        throw new ApiClientError(
+          "The request timed out. Check your connection and try again.",
+          "TIMEOUT",
+          0,
+          error,
+        );
+      }
+
+      throw new ApiClientError(
+        "Unable to reach Project AGAP.",
+        "NETWORK_ERROR",
+        0,
+        error,
+      );
     }
+
+    const body = (await response.json().catch(() => null)) as ApiEnvelope<T> | null;
+
+    if (!body) {
+      throw new ApiClientError(
+        "Project AGAP returned an unreadable response.",
+        "INVALID_RESPONSE",
+        response.status,
+      );
+    }
+
+    if (!response.ok || body.success !== true) {
+      throw new ApiClientError(
+        body.error?.message ?? "Project AGAP request failed.",
+        body.error?.code ?? "REQUEST_FAILED",
+        response.status,
+        body.error?.details,
+      );
+    }
+
     return body.data as T;
-  } catch (error) {
-    if (error instanceof DOMException && error.name === "AbortError") {
-      throw new Error("The request timed out. Check your connection and try again.");
-    }
-    throw error;
   } finally {
-    window.clearTimeout(timeout);
+    globalThis.clearTimeout(timeout);
   }
 }
 
