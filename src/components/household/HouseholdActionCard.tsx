@@ -66,6 +66,25 @@ export interface HouseholdActionCardProps {
 
 const COMMUNICATION_OPTIONS = ["SMS", "Mobile Internet", "Radio", "Barangay Announcements"];
 
+function formatHouseholdDateTime(value: string | null | undefined) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-PH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "Asia/Manila",
+  }).format(date);
+}
+
+function householdRuleReference(value: string | null | undefined) {
+  if (!value) return { id: "—", source: "—" };
+  const match = value.match(/^([^\s(]+)\s*\((.+)\)$/);
+  if (match) return { id: match[1], source: match[2] };
+  const [id, ...source] = value.split(" · ");
+  return { id: id?.trim() || "—", source: source.join(" · ").trim() || "—" };
+}
+
 export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
   barangays,
   initialBarangay,
@@ -823,7 +842,7 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
                     />
                   </div>
                   <p className="mt-1 text-sm font-semibold text-slate-900">
-                    {output.advisoryValidity ?? "—"}
+                    {formatHouseholdDateTime(output.advisoryValidity)}
                   </p>
                   <p className="mt-1 text-xs text-slate-500">
                     {output.advisoryVerificationState.replaceAll("_", " ")}
@@ -847,31 +866,46 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
 
                 {output.actions.length > 0 ? (
                   <div className="mt-3 space-y-3">
-                    {output.actions.map((action) => (
-                      <article
-                        key={action.id}
-                        className="rounded-xl border border-slate-200 p-4"
-                      >
-                        <div className="flex gap-3">
-                          <CheckCircle2
-                            className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
-                            aria-hidden="true"
-                          />
-                          <div>
-                            <h4 className="text-sm font-bold text-slate-900">
-                              {action.title}
-                            </h4>
-                            <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                              {action.explanation}
-                            </p>
-                            <p className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                              {language === "en" ? "Guidance Source Reference" : "Reference ng Guidance"}:{" "}
-                              {action.sourceRule ?? "—"}
-                            </p>
+                    {output.actions.map((action) => {
+                      const rule = householdRuleReference(action.sourceRule);
+                      return (
+                        <article
+                          key={action.id}
+                          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                        >
+                          <div className="flex gap-3">
+                            <CheckCircle2
+                              className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600"
+                              aria-hidden="true"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <h4 className="text-sm font-bold leading-relaxed text-slate-900">
+                                {action.title}
+                              </h4>
+                              <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                                {action.explanation}
+                              </p>
+                              <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-700">
+                                <span className="font-semibold text-slate-900">
+                                  {language === "en" ? "Guidance rule: " : "Guidance rule: "}
+                                </span>
+                                {rule.id}
+                              </div>
+                              {rule.source !== "—" ? (
+                                <details className="agap-household-print-hide mt-2 text-xs">
+                                  <summary className="cursor-pointer font-semibold text-blue-700">
+                                    {language === "en" ? "View source details" : "Tingnan ang source details"}
+                                  </summary>
+                                  <p className="mt-2 break-words rounded-lg border border-slate-200 bg-slate-50 p-3 leading-relaxed text-slate-600">
+                                    {rule.source}
+                                  </p>
+                                </details>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
-                      </article>
-                    ))}
+                        </article>
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-5 text-center">
@@ -890,7 +924,7 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
                     {language === "en" ? "Card Prepared" : "Oras ng Paghahanda ng Card"}
                   </span>
                   <p className="mt-1 text-xs font-semibold text-slate-800">
-                    {output.generatedAt ?? "—"}
+                    {formatHouseholdDateTime(output.generatedAt)}
                   </p>
                 </div>
 
@@ -906,7 +940,7 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
                     />
                   </div>
                   <p className="mt-1 text-xs font-semibold text-slate-800">
-                    {output.lastSyncAt ?? (language === "en" ? "Not available" : "Hindi available")}
+                    {output.lastSyncAt ? formatHouseholdDateTime(output.lastSyncAt) : (language === "en" ? "Not available" : "Hindi available")}
                   </p>
                 </div>
               </div>
