@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 const mockFrom = vi.fn();
 
 vi.mock("@/lib/server/supabase", () => ({
-  createAdminClient: () => ({
+  createPublicDataClient: () => ({
     from: mockFrom,
   }),
 }));
@@ -21,7 +21,9 @@ describe("public preparedness route", () => {
     });
 
     const { GET } = await import("./route");
-    const response = await GET(new Request("https://example.test/api/public/preparedness"));
+    const response = await GET(
+      new Request("https://example.test/api/public/preparedness"),
+    );
     const json = await response.json();
 
     expect(response.status).toBe(200);
