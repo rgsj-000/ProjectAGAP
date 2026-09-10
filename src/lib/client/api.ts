@@ -2,10 +2,27 @@ import type { AdvisoryFormValues } from "@/components/advisory/AdvisoryForm";
 import type { HouseholdCardOutput, HouseholdQuickProfile } from "@/components/household/HouseholdActionCard";
 
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, { ...init, headers: { "content-type": "application/json", ...init?.headers } });
-  const body = await response.json();
-  if (!response.ok || !body.success) throw new Error(body.error?.message ?? "Project AGAP request failed.");
-  return body.data as T;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 30000);
+  try {
+    const response = await fetch(url, {
+      ...init,
+      signal: init?.signal ?? controller.signal,
+      headers: { "content-type": "application/json", ...init?.headers },
+    });
+    const body = await response.json().catch(() => null);
+    if (!response.ok || !body?.success) {
+      throw new Error(body?.error?.message ?? "Project AGAP request failed.");
+    }
+    return body.data as T;
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("The request timed out. Check your connection and try again.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 export function saveAdvisory(values: AdvisoryFormValues, evidence?: unknown) {

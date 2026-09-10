@@ -107,6 +107,11 @@ export const HouseholdActionCard: React.FC<HouseholdActionCardProps> = ({
       setSelectedBarangay(lockedBarangay);
     }
   }, [lockedBarangay]);
+  useEffect(() => {
+    if (!selectedBarangay && barangays.length > 0 && !lockedBarangay) {
+      setSelectedBarangay(barangays[0]);
+    }
+  }, [barangays, lockedBarangay, selectedBarangay]);
 
   const toggleCommunicationMethod = (value: string) => {
     setCommunicationMethods((current) =>

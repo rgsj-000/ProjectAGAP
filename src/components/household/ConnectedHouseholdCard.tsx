@@ -15,6 +15,7 @@ export function ConnectedHouseholdCard() {
   const [barangays, setBarangays] = useState<string[]>([]);
   const [output, setOutput] = useState<HouseholdCardOutput | null>(null);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [busy, setBusy] = useState(false);
   const [offline, setOffline] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -50,6 +51,7 @@ export function ConnectedHouseholdCard() {
   async function generate(request: Record<string, unknown>) {
     setBusy(true);
     setError("");
+    setSuccess("");
     setOutput(null);
     try {
       let card: HouseholdCardOutput;
@@ -57,7 +59,7 @@ export function ConnectedHouseholdCard() {
         .trim()
         .toUpperCase();
       if (navigator.onLine) {
-        card = await api<HouseholdCardOutput>("/api/households/action-card", {
+        const response = await api<HouseholdCardOutput>("/api/households/action-card", {
           method: "POST",
           body: JSON.stringify({
             ...request,
@@ -65,6 +67,14 @@ export function ConnectedHouseholdCard() {
             language,
           }),
         });
+        if (
+          !response ||
+          typeof response.barangay !== "string" ||
+          !Array.isArray(response.actions)
+        ) {
+          throw new Error("The household card response was incomplete. Please try again.");
+        }
+        card = { ...response, actions: [...response.actions] };
         card.lastSyncAt = new Date().toISOString();
         try { const pack = await api<any>(
           `/api/public/preparedness?barangay=${encodeURIComponent(card.barangay)}`,
@@ -113,6 +123,7 @@ export function ConnectedHouseholdCard() {
           ],
         };
       setOutput(card);
+      setSuccess("Household preparedness card generated successfully.");
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -139,6 +150,14 @@ export function ConnectedHouseholdCard() {
           className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
         >
           {error}
+        </p>
+      )}
+      {success && (
+        <p
+          role="status"
+          className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"
+        >
+          {success}
         </p>
       )}
       <HouseholdActionCard

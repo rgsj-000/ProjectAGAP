@@ -34,6 +34,9 @@ type Workspace = {
   role: string;
   synchronizedAt: string;
 } & Record<string, any>;
+type ReviewDialog =
+  | { kind: "verify"; report: Row }
+  | { kind: "conflict"; conflict: Row };
 const inputClass =
   "mt-1 min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100";
 function Field({
@@ -131,6 +134,9 @@ export function OperationalWorkspace() {
   const [auditRows, setAuditRows] = useState<Row[]>([]);
   const [offline, setOffline] = useState(false);
   const [showAdvisory, setShowAdvisory] = useState(false);
+  const [workingLabel, setWorkingLabel] = useState("Working…");
+  const [reviewDialog, setReviewDialog] = useState<ReviewDialog | null>(null);
+  const [reviewReason, setReviewReason] = useState("");
   const reviewer = data?.role === "admin" || data?.role === "lgu_reviewer";
   const barangay = data?.barangays.find((b: Row) => b.id === barangayId);
   const advisory = data?.advisories.find((a: Row) => a.id === advisoryId);
@@ -244,10 +250,12 @@ export function OperationalWorkspace() {
   async function run(
     action: () => Promise<void>,
     success = "Saved successfully.",
+    working = "Working…",
   ) {
     setBusy(true);
     setError("");
     setMessage("");
+    setWorkingLabel(working);
     try {
       await action();
       setMessage(success);
@@ -271,12 +279,40 @@ export function OperationalWorkspace() {
       hazardId,
       advisoryId,
     });
+    if (!result?.situation || !result.outputId) {
+      throw new Error("The LGU action-card response was incomplete. Please try again.");
+    }
     setCard(result);
     await cacheOfflinePack(
       `lgu:${data!.userId}:${barangayId}:${advisoryId}:${hazardId}`,
       result,
     );
     await loadActions(result.outputId);
+  }
+  async function submitReviewDialog(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const reason = reviewReason.trim();
+    if (reason.length < 10) {
+      setError("Enter at least 10 characters explaining the evidence or resolution.");
+      return;
+    }
+    const dialog = reviewDialog;
+    if (!dialog) return;
+    await run(async () => {
+      if (dialog.kind === "verify") {
+        await post(`/api/damage-reports/${dialog.report.id}/verify`, { reason });
+        await loadReports();
+      } else {
+        await post(`/api/conflicts/${dialog.conflict.id}/resolve`, {
+          resolution: "KEEP_SERVER",
+          reason,
+        });
+        await clearResolvedLocalConflict(dialog.conflict.client_id);
+        setConflicts((old) => old.filter((item) => item.id !== dialog.conflict.id));
+      }
+    }, dialog.kind === "verify" ? "Report and linked needs verified; audit recorded." : "Conflict resolved; server record retained.");
+    setReviewDialog(null);
+    setReviewReason("");
   }
   useEffect(() => {
     if (!data || !barangayId) return;
@@ -299,10 +335,11 @@ export function OperationalWorkspace() {
   const submit = (
     e: FormEvent<HTMLFormElement>,
     fn: (form: FormData) => Promise<void>,
+    working = "Working…",
   ) => {
     e.preventDefault();
     const form = new FormData(e.currentTarget);
-    void run(() => fn(form));
+    void run(() => fn(form), "Saved successfully.", working);
   };
   const contextSelector = (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -411,7 +448,7 @@ export function OperationalWorkspace() {
           role="status"
           className="rounded-xl bg-blue-50 p-4 text-sm text-blue-900"
         >
-          {busy ? "Working…" : message}
+          {busy ? workingLabel : message}
         </p>
       )}
       {contextSelector}
@@ -933,12 +970,18 @@ export function OperationalWorkspace() {
               className="space-y-4"
               onSubmit={(e) =>
                 submit(e, async (f) => {
+                  const reportIds = f.getAll("reportIds").filter(
+                    (value): value is string => typeof value === "string" && value.length > 0,
+                  );
+                  if (reportIds.length === 0) {
+                    throw new Error("Select at least one report before generating the post-impact card.");
+                  }
                   const result = await post<Row>(
                     "/api/post-impact/consolidate",
                     {
                       barangayId,
                       advisoryId,
-                      reportIds: f.getAll("reportIds"),
+                      reportIds,
                       reason: f.get("reason"),
                       nonOverlapping: f.get("nonOverlapping") === "on",
                     },
@@ -949,7 +992,7 @@ export function OperationalWorkspace() {
                     `post:${data.userId}:${barangayId}`,
                     result,
                   );
-                })
+                }, "Generating Post Impact Action Card…")
               }
             >
               {reports
@@ -976,19 +1019,10 @@ export function OperationalWorkspace() {
                     {r.verification_status !== "VERIFIED" && (
                       <Button
                         disabled={!reviewer || busy || offline}
-                        onClick={() =>
-                          void run(async () => {
-                            const reason = window.prompt(
-                              "Record the evidence used to verify this report's figures and linked needs (at least 10 characters).",
-                            );
-                            if (!reason)
-                              throw new Error("Verification cancelled.");
-                            await post(`/api/damage-reports/${r.id}/verify`, {
-                              reason,
-                            });
-                            await loadReports();
-                          }, "Report and linked needs verified; audit recorded.")
-                        }
+                        onClick={() => {
+                          setReviewReason("");
+                          setReviewDialog({ kind: "verify", report: r });
+                        }}
                       >
                         Verify report & linked needs
                       </Button>
@@ -1137,18 +1171,10 @@ export function OperationalWorkspace() {
               <Button
                 disabled={busy || !reviewer}
                 onClick={() =>
-                  void run(async () => {
-                    const reason = window.prompt(
-                      "Why should the server record be kept? (at least 10 characters)",
-                    );
-                    if (!reason) throw new Error("Resolution cancelled.");
-                    await post(`/api/conflicts/${c.id}/resolve`, {
-                      resolution: "KEEP_SERVER",
-                      reason,
-                    });
-                    await clearResolvedLocalConflict(c.client_id);
-                    setConflicts((old) => old.filter((x) => x.id !== c.id));
-                  }, "Conflict resolved; server record retained.")
+                  (() => {
+                    setReviewReason("");
+                    setReviewDialog({ kind: "conflict", conflict: c });
+                  })()
                 }
               >
                 Keep server record with reason
@@ -1165,6 +1191,52 @@ export function OperationalWorkspace() {
           </ol>
         )}
       </Section>
+      {reviewDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4" role="presentation">
+          <form
+            className="w-full max-w-lg space-y-4 rounded-2xl bg-white p-6 shadow-2xl"
+            onSubmit={submitReviewDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="review-dialog-title"
+          >
+            <div>
+              <h2 id="review-dialog-title" className="text-lg font-bold text-slate-900">
+                {reviewDialog.kind === "verify" ? "Verify report and linked needs" : "Resolve conflict"}
+              </h2>
+              <p className="mt-1 text-sm text-slate-600">
+                {reviewDialog.kind === "verify"
+                  ? "Record the evidence used to confirm the reported figures and needs."
+                  : "Explain why the server record should be retained."}
+              </p>
+            </div>
+            <label className="block text-sm font-medium text-slate-700">
+              Evidence or resolution reason
+              <textarea
+                className={`${inputClass} min-h-28`}
+                value={reviewReason}
+                onChange={(event) => setReviewReason(event.target.value)}
+                minLength={10}
+                required
+                autoFocus
+              />
+            </label>
+            <div className="flex justify-end gap-3">
+              <Button
+                onClick={() => {
+                  setReviewDialog(null);
+                  setReviewReason("");
+                }}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={busy}>
+                {reviewDialog.kind === "verify" ? "Verify report" : "Keep server record"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
