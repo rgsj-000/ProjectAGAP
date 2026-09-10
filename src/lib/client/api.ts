@@ -1,10 +1,71 @@
 import type { AdvisoryFormValues } from "@/components/advisory/AdvisoryForm";
 import type { HouseholdCardOutput, HouseholdQuickProfile } from "@/components/household/HouseholdActionCard";
 
+type ApiErrorPayload = {
+  code?: string;
+  message?: string;
+  details?: unknown;
+};
+
+type ApiEnvelope<T> = {
+  success?: boolean;
+  data?: T;
+  error?: ApiErrorPayload;
+};
+
+export class ApiClientError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly status: number,
+    public readonly details?: unknown,
+  ) {
+    super(message);
+    this.name = "ApiClientError";
+  }
+}
+
 export async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, { ...init, headers: { "content-type": "application/json", ...init?.headers } });
-  const body = await response.json();
-  if (!response.ok || !body.success) throw new Error(body.error?.message ?? "Project AGAP request failed.");
+  let response: Response;
+
+  try {
+    response = await fetch(url, {
+      ...init,
+      headers: {
+        "content-type": "application/json",
+        ...init?.headers,
+      },
+    });
+  } catch (error) {
+    throw new ApiClientError(
+      "Unable to reach Project AGAP.",
+      "NETWORK_ERROR",
+      0,
+      error,
+    );
+  }
+
+  let body: ApiEnvelope<T>;
+
+  try {
+    body = (await response.json()) as ApiEnvelope<T>;
+  } catch {
+    throw new ApiClientError(
+      "Project AGAP returned an unreadable response.",
+      "INVALID_RESPONSE",
+      response.status,
+    );
+  }
+
+  if (!response.ok || body.success !== true) {
+    throw new ApiClientError(
+      body.error?.message ?? "Project AGAP request failed.",
+      body.error?.code ?? "REQUEST_FAILED",
+      response.status,
+      body.error?.details,
+    );
+  }
+
   return body.data as T;
 }
 
