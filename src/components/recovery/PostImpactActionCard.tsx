@@ -4,6 +4,7 @@ import React, { useRef } from "react";
 import {
   AlertTriangle,
   Building2,
+  CheckCircle2,
   CheckSquare,
   FileEdit,
   Printer,
@@ -100,6 +101,26 @@ const actionStatusStyles: Record<PostImpactActionStatus, string> = {
 function display(value: string | null | undefined) {
   if (value === null || value === undefined || value.trim() === "") return EMPTY;
   return value;
+}
+
+function formatDateTime(value: string | null | undefined) {
+  if (!value) return EMPTY;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-PH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function hasRecordedPreEventEstimate(
+  value: PostImpactActionCardProps["preEventComparison"],
+) {
+  return Boolean(
+    value?.estimatedPotentiallyExposedPopulation ||
+      value?.estimateMethod ||
+      value?.estimateConfidence,
+  );
 }
 
 function MetricCard({
@@ -256,6 +277,12 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
     (item) => item.phase === "STABILIZATION"
   );
   const mitigationActions = actions.filter((item) => item.phase === "MITIGATION");
+  const hasPreEventEstimate = hasRecordedPreEventEstimate(preEventComparison);
+  const noPopulationPendingValidation =
+    Number(observedImpacts?.awaitingValidationPersons ?? 0) === 0;
+  const allReportedPopulationValidated =
+    observedImpacts?.verificationState === "VERIFIED" &&
+    noPopulationPendingValidation;
 
   const renderActionGroup = (
     titleEn: string,
@@ -522,7 +549,7 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
             <span>
               {language === "en" ? "Last validation update:" : "Huling validation update:"}{" "}
               <strong className="text-slate-700">
-                {display(observedImpacts?.lastValidatedAt)}
+                {formatDateTime(observedImpacts?.lastValidatedAt)}
               </strong>
             </span>
           </div>
@@ -627,25 +654,37 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
                   align="left"
                 />
               </div>
-              <p className="mt-2 text-sm font-semibold text-slate-900">
-                {display(
-                  preEventComparison?.estimatedPotentiallyExposedPopulation
-                )}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                {language === "en" ? "Estimation Method:" : "Paraan ng Pagtatantiya:"}{" "}
-                {display(preEventComparison?.estimateMethod)}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                <span className="inline-flex items-center gap-1">
-                  {language === "en" ? "Confidence Level:" : "Confidence Level:"}
-                  <HelpTooltip
-                    content={getHelpContent("confidenceLevel", language)}
-                    align="left"
-                  />
-                </span>{" "}
-                {display(preEventComparison?.estimateConfidence)}
-              </p>
+              {hasPreEventEstimate ? (
+                <>
+                  <p className="mt-2 text-sm font-semibold text-slate-900">
+                    {display(
+                      preEventComparison?.estimatedPotentiallyExposedPopulation
+                    )}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {language === "en" ? "Estimation Method:" : "Paraan ng Pagtatantiya:"}{" "}
+                    {display(preEventComparison?.estimateMethod)}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    <span className="inline-flex items-center gap-1">
+                      {language === "en" ? "Confidence Level:" : "Confidence Level:"}
+                      <HelpTooltip
+                        content={getHelpContent("confidenceLevel", language)}
+                        align="left"
+                      />
+                    </span>{" "}
+                    {display(preEventComparison?.estimateConfidence)}
+                  </p>
+                </>
+              ) : (
+                <div className="mt-2 rounded-lg border border-dashed border-slate-200 bg-white/70 p-3">
+                  <p className="text-xs leading-relaxed text-slate-500">
+                    {language === "en"
+                      ? "No pre-disaster exposure estimate is linked to this incident."
+                      : "Walang naka-link na pre-disaster exposure estimate sa insidenteng ito."}
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="rounded-xl border border-blue-200 bg-blue-50/60 p-4">
@@ -705,12 +744,31 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
                 </li>
               ))}
             </ul>
+          ) : allReportedPopulationValidated ? (
+            <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+              <CheckCircle2
+                className="mt-0.5 h-4 w-4 shrink-0 text-emerald-700"
+                aria-hidden="true"
+              />
+              <div>
+                <p className="text-xs font-semibold text-emerald-900">
+                  {language === "en"
+                    ? "All currently reported population impacts have been validated."
+                    : "Lahat ng kasalukuyang naiulat na population impacts ay validated na."}
+                </p>
+                <p className="mt-1 text-[11px] leading-relaxed text-emerald-800">
+                  {language === "en"
+                    ? "Any newly submitted field report will return to the normal verification workflow before it changes validated totals."
+                    : "Ang bagong field report ay dadaan muna sa normal verification workflow bago nito mabago ang validated totals."}
+                </p>
+              </div>
+            </div>
           ) : (
             <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-5 text-center">
               <p className="text-xs text-slate-500">
                 {language === "en"
-                  ? "No pending-validation information is available in this card yet."
-                  : "Wala pang pending-validation information na available sa card na ito."}
+                  ? "No additional pending-validation details are recorded in this card."
+                  : "Walang karagdagang pending-validation details na nakatala sa card na ito."}
               </p>
             </div>
           )}
