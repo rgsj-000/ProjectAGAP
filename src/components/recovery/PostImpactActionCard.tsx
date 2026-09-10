@@ -175,6 +175,7 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
 }) => {
   const { language } = useLanguage();
   const printableCardRef = useRef<HTMLDivElement>(null);
+  const hasCardControls = Boolean(onValidateImpacts || onRequestUpdate || onRecordDecision);
 
   const printPostImpactCard = () => {
     if (!printableCardRef.current || typeof window === "undefined") return;
@@ -751,49 +752,52 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
       </div>
 
       {/* Card-level controls */}
-      <div className="agap-post-impact-print-hide border-t border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-        <div className="mb-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-            {language === "en"
-              ? "Authorized Post-Impact Controls"
-              : "Authorized Post-Impact Controls"}
-          </h2>
-          <p className="mt-1 text-[11px] text-slate-500">
-            {language === "en"
-              ? "Controls remain disabled until their backend handlers are connected."
-              : "Mananatiling disabled ang controls hangga't hindi nakakonekta ang backend handlers."}
-          </p>
+      {hasCardControls ? (
+        <div className="agap-post-impact-print-hide border-t border-slate-200 bg-slate-50/80 p-4 sm:p-5">
+          <div className="mb-3">
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              {language === "en"
+                ? "Authorized Post-Impact Controls"
+                : "Authorized Post-Impact Controls"}
+            </h2>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Each visible control is connected to an available post-impact workflow.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {onValidateImpacts ? (
+              <button
+                type="button"
+                onClick={onValidateImpacts}
+                className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+              >
+                {language === "en" ? "Validate Reported Impacts" : "I-validate ang Naiulat na Epekto"}
+              </button>
+            ) : null}
+
+            {onRequestUpdate ? (
+              <button
+                type="button"
+                onClick={onRequestUpdate}
+                className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+              >
+                {language === "en" ? "Request Update" : "Humiling ng Update"}
+              </button>
+            ) : null}
+
+            {onRecordDecision ? (
+              <button
+                type="button"
+                onClick={onRecordDecision}
+                className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+              >
+                {language === "en" ? "Record Decision" : "Itala ang Desisyon"}
+              </button>
+            ) : null}
+          </div>
         </div>
-
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={onValidateImpacts}
-            disabled={!onValidateImpacts}
-            className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition enabled:hover:border-blue-200 enabled:hover:bg-blue-50 enabled:hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {language === "en" ? "Validate Reported Impacts" : "I-validate ang Naiulat na Epekto"}
-          </button>
-
-          <button
-            type="button"
-            onClick={onRequestUpdate}
-            disabled={!onRequestUpdate}
-            className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition enabled:hover:border-blue-200 enabled:hover:bg-blue-50 enabled:hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {language === "en" ? "Request Update" : "Humiling ng Update"}
-          </button>
-
-          <button
-            type="button"
-            onClick={onRecordDecision}
-            disabled={!onRecordDecision}
-            className="rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition enabled:hover:border-blue-200 enabled:hover:bg-blue-50 enabled:hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-45"
-          >
-            {language === "en" ? "Record Decision" : "Itala ang Desisyon"}
-          </button>
-        </div>
-      </div>
+      ) : null}
     </div>
   );
 };
