@@ -110,7 +110,76 @@ function formatDateTime(value: string | null | undefined) {
   return new Intl.DateTimeFormat("en-PH", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "Asia/Manila",
   }).format(date);
+}
+
+function humanizeToken(value: unknown) {
+  if (value === null || value === undefined || value === "") return EMPTY;
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  if (typeof value === "number") return new Intl.NumberFormat("en-PH").format(value);
+  return String(value)
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replaceAll("_", " ")
+    .replaceAll("-", " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function friendlyEvidence(value: string | null | undefined) {
+  if (!value) return EMPTY;
+
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const record = parsed as Record<string, unknown>;
+      const field = String(record.field ?? "");
+      const fieldLabels: Record<string, string> = {
+        hasValidatedAffectedHouseholds: "Affected households validated",
+        hasValidatedAffectedPopulation: "Affected population validated",
+        populationAwaitingValidation: "Affected persons awaiting validation",
+        householdsAwaitingValidation: "Households awaiting validation",
+        waterNeedValidated: "Water need validated",
+        foodNeedValidated: "Food need validated",
+        shelterNeedValidated: "Shelter need validated",
+        medicineNeedValidated: "Medicine need validated",
+        rescueNeedValidated: "Rescue need validated",
+        restorationNeedValidated: "Service restoration need validated",
+        hasAnyValidatedNeed: "Priority need validated",
+        hasAccessibilityConstraints: "Access constraint confirmed",
+        accessibilityConstraints: "Access constraint confirmed",
+        hasServiceDisruption: "Service disruption recorded",
+        serviceDisruption: "Service disruption recorded",
+        hasVulnerableGroups: "Vulnerable groups reported",
+        validationIncomplete: "Validation still incomplete",
+      };
+
+      if (field in fieldLabels) {
+        const label = fieldLabels[field];
+        if (typeof record.value === "boolean") return label;
+        if (record.value !== undefined && record.value !== null) {
+          return `${label}: ${humanizeToken(record.value)}`;
+        }
+        return label;
+      }
+
+      if ("field" in record && "value" in record) {
+        return `${humanizeToken(field)}: ${humanizeToken(record.value)}`;
+      }
+    }
+  } catch {
+    // Already human-readable text.
+  }
+
+  return value;
+}
+
+function parseRuleReference(value: string | null | undefined) {
+  if (!value) return { id: EMPTY, source: EMPTY };
+  const [id, ...sourceParts] = value.split(" · ");
+  return {
+    id: id?.trim() || EMPTY,
+    source: sourceParts.join(" · ").trim() || EMPTY,
+  };
 }
 
 function hasRecordedPreEventEstimate(
@@ -302,107 +371,157 @@ export const PostImpactActionCard: React.FC<PostImpactActionCardProps> = ({
 
       {items.length > 0 ? (
         <div className="mt-3 space-y-3">
-          {items.map((item) => (
-            <article
-              key={item.id}
-              className="rounded-xl border border-slate-200 bg-slate-50/40 p-4"
-            >
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <h4 className="text-sm font-bold text-slate-900">
-                    {item.action}
-                  </h4>
-                  <p className="mt-1 text-xs leading-relaxed text-slate-600">
-                    {display(item.whyItApplies)}
-                  </p>
-                </div>
+          {items.map((item) => {
+            const status = item.status ?? "RECOMMENDED";
+            const rule = parseRuleReference(item.sourceRule);
+            const canAssign =
+              Boolean(onAssignAction) &&
+              ["RECOMMENDED", "FOR_VALIDATION"].includes(status);
+            const canReassign =
+              Boolean(onAssignAction) &&
+              ["ASSIGNED", "IN_PROGRESS"].includes(status);
+            const canStart =
+              Boolean(onUpdateActionStatus) && status === "ASSIGNED";
+            const canResolve =
+              Boolean(onUpdateActionStatus) && status === "IN_PROGRESS";
 
-                {item.status ? (
-                  <span
-                    className={`self-start rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${actionStatusStyles[item.status]}`}
-                  >
-                    {item.status.replaceAll("_", " ")}
-                  </span>
-                ) : null}
-              </div>
+            return (
+              <article
+                key={item.id}
+                className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
+              >
+                <div className="p-4 sm:p-5">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-sm font-bold leading-relaxed text-slate-950">
+                        {item.action}
+                      </h4>
+                      <p className="mt-1 text-xs leading-relaxed text-slate-600">
+                        {display(item.whyItApplies)}
+                      </p>
+                    </div>
 
-              <dl className="mt-4 grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
-                <div>
-                  <dt className="font-bold text-slate-400">
-                    {language === "en" ? "Evidence" : "Ebidensya"}
-                  </dt>
-                  <dd className="mt-0.5 text-slate-700">
-                    {display(item.evidence)}
-                  </dd>
-                </div>
-
-                <div>
-                  <dt className="font-bold text-slate-400">
-                    {language === "en" ? "Action Rule Reference" : "Reference ng Action Rule"}
-                  </dt>
-                  <dd className="mt-0.5 text-slate-700">
-                    {display(item.sourceRule)}
-                  </dd>
-                </div>
-
-                <div>
-                  <dt className="font-bold text-slate-400">
-                    {language === "en" ? "Responsible Unit" : "Responsableng Yunit"}
-                  </dt>
-                  <dd className="mt-0.5 text-slate-700">
-                    {display(item.responsibleUnit)}
-                  </dd>
-                </div>
-
-                <div>
-                  <dt className="font-bold text-slate-400">
-                    {language === "en"
-                      ? "LGU Confirmation Required"
-                      : "Kailangan ang LGU Confirmation"}
-                  </dt>
-                  <dd className="mt-0.5 text-slate-700">
-                    {item.confirmationRequired === null
-                      ? EMPTY
-                      : item.confirmationRequired
-                        ? language === "en"
-                          ? "Required"
-                          : "Kailangan"
-                        : language === "en"
-                          ? "Not required"
-                          : "Hindi kailangan"}
-                  </dd>
-                </div>
-              </dl>
-
-              {(onAssignAction || onUpdateActionStatus) && (
-                <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-3">
-                  {onAssignAction && (
-                    <button
-                      type="button"
-                      onClick={() => onAssignAction(item.id)}
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                    <span
+                      className={`self-start rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${actionStatusStyles[status]}`}
                     >
-                      {language === "en" ? "Assign Action" : "Magtalaga ng Aksyon"}
-                    </button>
-                  )}
+                      {status.replaceAll("_", " ")}
+                    </span>
+                  </div>
 
-                  {onUpdateActionStatus && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onUpdateActionStatus(item.id, "IN_PROGRESS")
-                      }
-                      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
-                    >
-                      {language === "en"
-                        ? "Mark In Progress"
-                        : "Markahan bilang In Progress"}
-                    </button>
-                  )}
+                  <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="min-w-0 rounded-lg bg-slate-50 px-3 py-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {language === "en" ? "Trigger" : "Trigger"}
+                      </p>
+                      <p className="mt-1 break-words text-xs font-medium leading-relaxed text-slate-700">
+                        {friendlyEvidence(item.evidence)}
+                      </p>
+                    </div>
+                    <div className="min-w-0 rounded-lg bg-slate-50 px-3 py-2.5">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                        {language === "en" ? "Responsible Office" : "Responsableng Tanggapan"}
+                      </p>
+                      <p className="mt-1 break-words text-xs font-medium leading-relaxed text-slate-700">
+                        {display(item.responsibleUnit)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <details className="agap-post-impact-print-hide mt-3 rounded-lg border border-slate-200 bg-slate-50/70">
+                    <summary className="cursor-pointer px-3 py-2.5 text-xs font-semibold text-blue-700">
+                      {language === "en" ? "View rule and evidence details" : "Tingnan ang rule at evidence details"}
+                    </summary>
+                    <div className="grid grid-cols-1 gap-3 border-t border-slate-200 px-3 py-3 text-xs sm:grid-cols-2">
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-400">
+                          {language === "en" ? "Evidence" : "Ebidensya"}
+                        </p>
+                        <p className="mt-1 break-words leading-relaxed text-slate-700">
+                          {friendlyEvidence(item.evidence)}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-400">
+                          {language === "en" ? "Action Rule" : "Action Rule"}
+                        </p>
+                        <p className="mt-1 break-words leading-relaxed text-slate-700">
+                          Rule {rule.id}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-400">
+                          {language === "en" ? "Rule Source" : "Rule Source"}
+                        </p>
+                        <p className="mt-1 break-words leading-relaxed text-slate-700">
+                          {rule.source}
+                        </p>
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-slate-400">
+                          {language === "en" ? "LGU Confirmation" : "LGU Confirmation"}
+                        </p>
+                        <p className="mt-1 text-slate-700">
+                          {item.confirmationRequired === null
+                            ? EMPTY
+                            : item.confirmationRequired
+                              ? language === "en"
+                                ? "Required"
+                                : "Kailangan"
+                              : language === "en"
+                                ? "Not required"
+                                : "Hindi kailangan"}
+                        </p>
+                      </div>
+                    </div>
+                  </details>
                 </div>
-              )}
-            </article>
-          ))}
+
+                {(canAssign || canReassign || canStart || canResolve) && (
+                  <div className="agap-post-impact-print-hide flex flex-wrap gap-2 border-t border-slate-100 bg-slate-50/60 px-4 py-3 sm:px-5">
+                    {canAssign && onAssignAction ? (
+                      <button
+                        type="button"
+                        onClick={() => onAssignAction(item.id)}
+                        className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100"
+                      >
+                        {language === "en" ? "Assign Action" : "Magtalaga ng Aksyon"}
+                      </button>
+                    ) : null}
+
+                    {canReassign && onAssignAction ? (
+                      <button
+                        type="button"
+                        onClick={() => onAssignAction(item.id)}
+                        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                      >
+                        {language === "en" ? "Change Assignment" : "Baguhin ang Assignment"}
+                      </button>
+                    ) : null}
+
+                    {canStart && onUpdateActionStatus ? (
+                      <button
+                        type="button"
+                        onClick={() => onUpdateActionStatus(item.id, "IN_PROGRESS")}
+                        className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100"
+                      >
+                        {language === "en" ? "Start Action" : "Simulan ang Aksyon"}
+                      </button>
+                    ) : null}
+
+                    {canResolve && onUpdateActionStatus ? (
+                      <button
+                        type="button"
+                        onClick={() => onUpdateActionStatus(item.id, "RESOLVED")}
+                        className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100"
+                      >
+                        {language === "en" ? "Mark Resolved" : "Markahan bilang Resolved"}
+                      </button>
+                    ) : null}
+                  </div>
+                )}
+              </article>
+            );
+          })}
         </div>
       ) : (
         <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-5 text-center">
