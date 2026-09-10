@@ -813,41 +813,6 @@ export function OperationalWorkspace() {
               >
                 Create advisory
               </Button>
-              {advisory && data.role !== "field_reporter" && !isFieldResponderUser && (
-                <button
-                  type="button"
-                  disabled={busy || offline}
-                  onClick={() => {
-                    setEditingAdvisoryId(advisory.id);
-                    setShowAdvisory(true);
-                  }}
-                  className="min-h-11 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-800 disabled:opacity-50"
-                >
-                  Edit advisory
-                </button>
-              )}
-              {advisory && data.role === "admin" && (
-                <button
-                  type="button"
-                  disabled={busy || offline}
-                  onClick={() =>
-                    void run(async () => {
-                      const confirmed = window.confirm(
-                        `Delete ${advisory.bulletin_reference}? Advisories already used by assessments or incident records cannot be deleted.`,
-                      );
-                      if (!confirmed) throw new Error("Deletion cancelled.");
-                      await deleteAdvisory(advisory.id);
-                      setAdvisoryId("");
-                      setEditingAdvisoryId("");
-                      setShowAdvisory(false);
-                      await load();
-                    }, "Advisory deleted.")
-                  }
-                  className="min-h-11 rounded-xl border border-red-200 bg-white px-4 py-2 text-sm font-semibold text-red-700 disabled:opacity-50"
-                >
-                  Delete advisory
-                </button>
-              )}
               {reviewer && (
                 <button
                   type="button"
@@ -865,55 +830,169 @@ export function OperationalWorkspace() {
                 Open assessment
               </Button>
             </div>
-            {showAdvisory && (
-              <AdvisoryForm
-                key={editingAdvisoryId || "create-advisory"}
-                initialValues={advisoryInitialValues}
-                onCancel={() => {
-                  setShowAdvisory(false);
-                  setEditingAdvisoryId("");
-                }}
-                onSave={async (values, file) => {
-                  let evidence: unknown;
-                  if (file) {
-                    const form = new FormData();
-                    form.set("file", file);
-                    form.set("kind", "advisory");
-                    const response = await fetch("/api/evidence", {
-                      method: "POST",
-                      body: form,
-                    });
-                    const result = await response.json();
-                    if (!response.ok)
-                      throw new Error(result.error?.message ?? "Upload failed");
-                    evidence = result.data;
-                  }
-                  const saved = editingAdvisoryId
-                    ? (await updateAdvisory(editingAdvisoryId, values, evidence) as Row)
-                    : (await saveAdvisory(values, evidence) as Row);
-                  await load();
-                  setShowAdvisory(false);
-                  setEditingAdvisoryId("");
-                  setAdvisoryId(saved.id);
-                  if (reviewer) {
-                    setReviewAdvisoryId(saved.id);
-                    setReviewEvidenceUrl("");
-                    setReviewReason("");
-                    setMessage(
-                      editingAdvisoryId
-                        ? "Advisory updated and returned to FOR REVIEW. Review the source again before verification."
-                        : "Advisory submitted. Review the uploaded evidence and click Verify advisory to activate it.",
-                    );
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  } else {
-                    setMessage(
-                      "Advisory submitted as FOR REVIEW. An Admin or LGU Reviewer must verify it before it becomes active.",
-                    );
-                  }
-                }}
-              />
-            )}
           </Section>
+
+          {(data.role === "admin" || data.role === "lgu_reviewer" || data.role === "lgu_encoder") && (
+            <Section title="Advisory records">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Manage source records
+                  </p>
+                  <p className="text-xs leading-5 text-slate-500">
+                    Editing changes a record back to FOR REVIEW. Delete is restricted to unused records and Admin users.
+                  </p>
+                </div>
+                <span className="text-xs font-medium text-slate-500">
+                  {data.advisories.length} record{data.advisories.length === 1 ? "" : "s"}
+                </span>
+              </div>
+
+              <div className="overflow-hidden rounded-xl border border-slate-200">
+                <div className="hidden grid-cols-[minmax(0,1fr)_120px_150px_190px] gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 md:grid">
+                  <span>Advisory</span>
+                  <span>Status</span>
+                  <span>Issued</span>
+                  <span className="text-right">Record actions</span>
+                </div>
+
+                <div className="divide-y divide-slate-200">
+                  {[...data.advisories]
+                    .sort((a: Row, b: Row) => rowTime(b.issue_time) - rowTime(a.issue_time))
+                    .map((item: Row) => (
+                      <div
+                        key={item.id}
+                        className={`grid gap-3 px-4 py-3 md:grid-cols-[minmax(0,1fr)_120px_150px_190px] md:items-center ${
+                          item.id === advisoryId ? "bg-blue-50/40" : "bg-white"
+                        }`}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setAdvisoryId(item.id)}
+                          className="min-w-0 text-left"
+                        >
+                          <p className="truncate text-sm font-bold text-slate-900">
+                            {item.advisory_type}
+                          </p>
+                          <p className="mt-0.5 truncate text-xs text-slate-500">
+                            {item.bulletin_reference} · {item.source_agency}
+                          </p>
+                        </button>
+
+                        <div>
+                          <span
+                            className={`inline-flex rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                              item.verification_status === "VERIFIED"
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                : item.verification_status === "FOR_REVIEW"
+                                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                                  : "border-slate-200 bg-slate-50 text-slate-700"
+                            }`}
+                          >
+                            {item.verification_status.replaceAll("_", " ")}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-slate-600">
+                          {formatRecordDate(item.issue_time)}
+                        </p>
+
+                        <div className="flex flex-wrap gap-2 md:justify-end">
+                          <button
+                            type="button"
+                            disabled={busy || offline}
+                            onClick={() => {
+                              setAdvisoryId(item.id);
+                              setEditingAdvisoryId(item.id);
+                              setShowAdvisory(true);
+                            }}
+                            className="min-h-9 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50 disabled:opacity-50"
+                          >
+                            Edit
+                          </button>
+                          {data.role === "admin" && (
+                            <button
+                              type="button"
+                              disabled={busy || offline}
+                              onClick={() =>
+                                void run(async () => {
+                                  const confirmed = window.confirm(
+                                    `Delete ${item.bulletin_reference}? Advisories already used by assessments or incident records cannot be deleted.`,
+                                  );
+                                  if (!confirmed) throw new Error("Deletion cancelled.");
+                                  await deleteAdvisory(item.id);
+                                  if (advisoryId === item.id) setAdvisoryId("");
+                                  if (editingAdvisoryId === item.id) {
+                                    setEditingAdvisoryId("");
+                                    setShowAdvisory(false);
+                                  }
+                                  await load();
+                                }, "Advisory deleted.")
+                              }
+                              className="min-h-9 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+
+              {showAdvisory && (
+                <div className="border-t border-slate-200 pt-5">
+                  <AdvisoryForm
+                    key={editingAdvisoryId || "create-advisory"}
+                    initialValues={advisoryInitialValues}
+                    onCancel={() => {
+                      setShowAdvisory(false);
+                      setEditingAdvisoryId("");
+                    }}
+                    onSave={async (values, file) => {
+                      let evidence: unknown;
+                      if (file) {
+                        const form = new FormData();
+                        form.set("file", file);
+                        form.set("kind", "advisory");
+                        const response = await fetch("/api/evidence", {
+                          method: "POST",
+                          body: form,
+                        });
+                        const result = await response.json();
+                        if (!response.ok)
+                          throw new Error(result.error?.message ?? "Upload failed");
+                        evidence = result.data;
+                      }
+                      const wasEditing = Boolean(editingAdvisoryId);
+                      const saved = editingAdvisoryId
+                        ? (await updateAdvisory(editingAdvisoryId, values, evidence) as Row)
+                        : (await saveAdvisory(values, evidence) as Row);
+                      await load();
+                      setShowAdvisory(false);
+                      setEditingAdvisoryId("");
+                      setAdvisoryId(saved.id);
+                      if (reviewer) {
+                        setReviewAdvisoryId(saved.id);
+                        setReviewEvidenceUrl("");
+                        setReviewReason("");
+                        setMessage(
+                          wasEditing
+                            ? "Advisory updated and returned to FOR REVIEW. Review the source again before verification."
+                            : "Advisory submitted. Review the uploaded evidence and click Verify advisory to activate it.",
+                        );
+                        window.scrollTo({ top: 0, behavior: "smooth" });
+                      } else {
+                        setMessage(
+                          "Advisory submitted as FOR REVIEW. An Admin or LGU Reviewer must verify it before it becomes active.",
+                        );
+                      }
+                    }}
+                  />
+                </div>
+              )}
+            </Section>
+          )}
         </>
       )}
       {view === "prepare" && (
