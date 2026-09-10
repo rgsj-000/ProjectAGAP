@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockFrom = vi.fn();
 
@@ -13,22 +13,21 @@ describe("public preparedness route", () => {
     mockFrom.mockReset();
   });
 
-  it("falls back to the demo barangay list when the database query fails", async () => {
+  it("does not fabricate a barangay list when the database is unavailable", async () => {
     mockFrom.mockReturnValue({
       select: () => ({
-        not: () => ({
-          order: async () => ({ data: null, error: { message: "DB unavailable" } }),
-        }),
+        order: async () => ({ data: null, error: { message: "DB unavailable" } }),
       }),
     });
 
     const { GET } = await import("./route");
-    const response = await GET(new Request("https://example.test/api/public/preparedness"));
+    const response = await GET(
+      new Request("https://example.test/api/public/preparedness"),
+    );
     const json = await response.json();
 
-    expect(response.status).toBe(200);
-    expect(json.success).toBe(true);
-    expect(json.data).toContain("Dalahican");
-    expect(json.data).toContain("Gulang-gulang");
+    expect(response.status).toBe(500);
+    expect(json.success).toBe(false);
+    expect(json.data).toBeUndefined();
   });
 });
