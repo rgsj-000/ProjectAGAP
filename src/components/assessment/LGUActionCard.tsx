@@ -463,6 +463,7 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
       onClick: onOverride,
     },
   ];
+  const availableControls = controls.filter((control) => Boolean(control.onClick));
 
   const riskCategory = humanizeToken(assessment?.riskCategory || "For review");
   const riskScore = formatNumber(assessment?.riskResult);
@@ -889,30 +890,31 @@ export const LGUActionCard: React.FC<LGUActionCardProps> = ({
           </details>
         </div>
 
-        <div className="agap-print-hide border-t border-slate-200 bg-slate-50/80 p-4 sm:p-5">
-          <div className="mb-3">
-            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              Authorized LGU Controls
-            </h2>
-            <p className="mt-1 text-[11px] text-slate-500">
-              These controls are available only to authorized LGU users. Disabled controls are not yet connected to the required system action.
-            </p>
-          </div>
+        {availableControls.length > 0 ? (
+          <div className="agap-print-hide border-t border-slate-200 bg-slate-50/80 p-4 sm:p-5">
+            <div className="mb-3">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                Authorized LGU Controls
+              </h2>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Each visible control is connected to an available review or action workflow.
+              </p>
+            </div>
 
-          <div className="flex flex-wrap gap-2">
-            {controls.map((control) => (
-              <button
-                key={control.label}
-                type="button"
-                onClick={control.onClick}
-                disabled={!control.onClick}
-                className="min-h-[38px] rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors enabled:hover:border-blue-200 enabled:hover:bg-blue-50 enabled:hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {control.label}
-              </button>
-            ))}
+            <div className="flex flex-wrap gap-2">
+              {availableControls.map((control) => (
+                <button
+                  key={control.label}
+                  type="button"
+                  onClick={control.onClick}
+                  className="min-h-[38px] rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700"
+                >
+                  {control.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
       </div>
     </div>
   );
