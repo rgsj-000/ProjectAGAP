@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 const mockFrom = vi.fn();
 
 vi.mock("@/lib/server/supabase", () => ({
-  createAdminClient: () => ({
+  createPublicDataClient: () => ({
     from: mockFrom,
   }),
 }));
@@ -16,7 +16,9 @@ describe("public preparedness route", () => {
   it("falls back to the demo barangay list when the database query fails", async () => {
     mockFrom.mockReturnValue({
       select: () => ({
-        order: async () => ({ data: null, error: { message: "DB unavailable" } }),
+        not: () => ({
+          order: async () => ({ data: null, error: { message: "DB unavailable" } }),
+        }),
       }),
     });
 

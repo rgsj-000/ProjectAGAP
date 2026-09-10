@@ -131,6 +131,12 @@ export function OperationalWorkspace() {
   const [auditRows, setAuditRows] = useState<Row[]>([]);
   const [offline, setOffline] = useState(false);
   const [showAdvisory, setShowAdvisory] = useState(false);
+  const [editingAdvisoryId, setEditingAdvisoryId] = useState("");
+  const [reviewAdvisoryId, setReviewAdvisoryId] = useState("");
+  const [reviewEvidenceUrl, setReviewEvidenceUrl] = useState("");
+  const [reviewReason, setReviewReason] = useState("");
+  const [workingLabel, setWorkingLabel] = useState("Working…");
+  const [reviewDialog, setReviewDialog] = useState<ReviewDialog | null>(null);
   const reviewer = data?.role === "admin" || data?.role === "lgu_reviewer";
   const barangay = data?.barangays.find((b: Row) => b.id === barangayId);
   const advisory = data?.advisories.find((a: Row) => a.id === advisoryId);

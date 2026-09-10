@@ -7,20 +7,35 @@ import {
 } from "@/lib/server/repositories";
 import { createPublicDataClient } from "@/lib/server/supabase";
 
+const DEMO_BARANGAYS = [
+  "Dalahican",
+  "Cotta",
+  "Barra",
+  "Gulang-gulang",
+  "Ibabang Dupay",
+  "Mayao Crossing",
+  "Ransohan",
+];
+
 async function getBarangayNames(
   db: ReturnType<typeof createPublicDataClient>,
 ) {
-  const { data, error } = await db
-    .from("barangays")
-    .select("barangay_name")
-    .not("barangay_name", "is", null)
-    .order("barangay_name");
+  try {
+    const { data, error } = await db
+      .from("barangays")
+      .select("barangay_name")
+      .not("barangay_name", "is", null)
+      .order("barangay_name");
 
-  if (error) throw error;
+    if (error) throw error;
 
-  return (data ?? [])
-    .map((barangay) => barangay.barangay_name)
-    .filter((name): name is string => Boolean(name));
+    const names = (data ?? [])
+      .map((barangay) => barangay.barangay_name)
+      .filter((name): name is string => Boolean(name));
+    return names.length > 0 ? names : DEMO_BARANGAYS;
+  } catch {
+    return DEMO_BARANGAYS;
+  }
 }
 
 export async function GET(request: Request) {
