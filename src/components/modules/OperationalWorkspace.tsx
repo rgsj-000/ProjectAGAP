@@ -467,7 +467,7 @@ export function OperationalWorkspace() {
 
   async function updatePostImpactAction(
     actionId: string,
-    status: "ASSIGNED" | "IN_PROGRESS",
+    status: "ASSIGNED" | "IN_PROGRESS" | "RESOLVED",
   ) {
     const action = actions.find((item) => item.id === actionId);
     if (!action) throw new Error("The saved operational action could not be found.");
@@ -482,11 +482,13 @@ export function OperationalWorkspace() {
 
     if (!responsibleUnit) return;
 
-    const reason = window.prompt(
-      status === "ASSIGNED"
-        ? "Assignment reason or instruction:"
-        : "Progress update / basis:",
-    )?.trim();
+    const promptByStatus = {
+      ASSIGNED: "Assignment reason or instruction:",
+      IN_PROGRESS: "Progress update or basis for starting this action:",
+      RESOLVED: "Resolution note or evidence that this action is complete:",
+    } as const;
+
+    const reason = window.prompt(promptByStatus[status])?.trim();
     if (!reason) return;
     if (reason.length < 10) {
       throw new Error("Enter at least 10 characters for the action reason.");
@@ -1625,10 +1627,16 @@ export function OperationalWorkspace() {
                   "Recording assignment…",
                 )
               }
-              onUpdateActionStatus={(actionId) =>
+              onUpdateActionStatus={(actionId, status) =>
                 void run(
-                  () => updatePostImpactAction(actionId, "IN_PROGRESS"),
-                  "Action status updated.",
+                  () =>
+                    updatePostImpactAction(
+                      actionId,
+                      status as "IN_PROGRESS" | "RESOLVED",
+                    ),
+                  status === "RESOLVED"
+                    ? "Action marked as resolved."
+                    : "Action started and marked in progress.",
                   "Updating action…",
                 )
               }
@@ -1964,7 +1972,10 @@ function ConnectedPostOutput({
   operationalActions: Row[];
   onValidateImpacts: () => void;
   onAssignAction: (actionId: string) => void;
-  onUpdateActionStatus: (actionId: string) => void;
+  onUpdateActionStatus: (
+    actionId: string,
+    status: "IN_PROGRESS" | "RESOLVED",
+  ) => void;
   onRequestUpdate: () => void;
   onRecordDecision: () => void;
 }) {
@@ -2026,7 +2037,9 @@ function ConnectedPostOutput({
       })}
       onValidateImpacts={onValidateImpacts}
       onAssignAction={onAssignAction}
-      onUpdateActionStatus={(actionId) => onUpdateActionStatus(actionId)}
+      onUpdateActionStatus={(actionId, status) =>
+        onUpdateActionStatus(actionId, status as "IN_PROGRESS" | "RESOLVED")
+      }
       onRequestUpdate={onRequestUpdate}
       onRecordDecision={onRecordDecision}
     />
